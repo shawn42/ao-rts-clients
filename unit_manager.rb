@@ -55,10 +55,13 @@ class UnitManager
   end
 
   def update_strategies
+    t = Time.now
     @units.values.each do |u|
       if u.strategy
         u.strategy.update
       end
+      elapsed_secs = Time.now - t
+      break if elapsed_secs > 0.1
     end
   end
 

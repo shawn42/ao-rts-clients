@@ -40,7 +40,10 @@ if $0 == __FILE__
         loop do
           msg = msg_from_server.pop
           msgs = [msg]
-          msgs << msg_from_server.pop until msg_from_server.empty?
+          until msg_from_server.empty?
+            puts "!!! missed turn!"
+            msgs << msg_from_server.pop 
+          end
 
           msgs.each do |msg|
             update_count += 1

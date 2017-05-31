@@ -8,6 +8,10 @@ class Unit
       @strategy.command
     end
   end
+
+  def alive?
+    status != 'dead'
+  end
 end
 
 class Tile

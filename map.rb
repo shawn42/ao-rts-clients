@@ -72,7 +72,7 @@ class Map
         end
         update_tile_attrs(tile, tu)
         if tile.units.any?{|u|u['type'] == 'base'}
-          puts "WOOHOO"
+          puts "WOOHOO. Found enemy base!"
           @enemy_base = tile 
         end
 
