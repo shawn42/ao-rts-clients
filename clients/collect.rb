@@ -12,7 +12,7 @@ class CollectUnitManager < UnitManager
       base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
     elsif scout_count < 1
       base.strategy = BuildIfYouCan.new(:scout, @map, base, self)
-    elsif worker_count < 22 #22
+    elsif worker_count < 24 #22
       base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
     else
       base.strategy = Noop.new(@map, base, self)

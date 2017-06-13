@@ -63,15 +63,16 @@ class Game
     @game_info[:player_id] ||= update_obj.player_id
     @game_info[:total_time] ||= update_obj.time
     @game_info[:time_remaining] = update_obj.time
+    @turn = update_obj.turn
 
     @map.update(update_obj)
-    @unit_manager.update(update_obj)
+    @unit_manager.update(update_obj, @turn)
   end
 
   def generate_commands
     @unit_manager.update_strategies
     cmds = @unit_manager.commands.compact
     # puts cmds.inspect unless cmds.empty?
-    {commands: cmds}
+    {commands: cmds, client_turn: @turn}
   end
 end

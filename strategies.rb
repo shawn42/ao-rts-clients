@@ -47,6 +47,7 @@ class Strategy
     nil
   end
   def gather_command(u, dir)
+    return if dir.nil?
     {
       command: "GATHER",
       unit: u.id,
@@ -54,6 +55,7 @@ class Strategy
     }
   end
   def move_command(u, dir)
+    return if dir.nil?
     {
       command: "MOVE",
       unit: u.id,
@@ -61,8 +63,9 @@ class Strategy
     }
   end
   def attack_command(u,tile)
+    return if tile.nil?
     {
-      command: "ATTACK",
+      command: "SHOOT",
       unit: u.id,
       dx: tile.x-u.x,
       dy: tile.y-u.y,
@@ -98,11 +101,19 @@ class CollectNearestResource < Strategy
   end
 
   def command
+    new_resource_target = @resource.nil?
+
+    if @unit.resource > 0 && !@turning_in
+      @turning_in = true
+      @path = nil
+    end
+
     if @unit.resource > 0
       move_command(@unit, dir_toward_base(@unit))
     else
-
+      @turning_in = false
       if @resource && @resource.resources.nil?
+        puts "resource ran out?"
         @unit_manager.unassign_resource(@unit, @res_id)
         @resource = nil 
         @res_id = nil
@@ -111,25 +122,30 @@ class CollectNearestResource < Strategy
       @res_id = @resource.resources.id if @resource
       adjacent_res = resource_adjacent(@unit, @resource)
 
-      if @resource && adjacent_res
+      if @resource && adjacent_res && @resouce != adjacent_res
+        puts "found resource on way to other resource"
         @unit_manager.unassign_resource(@unit, @res_id)
 
         @resource = adjacent_res
         r = @resource
         u = @unit
         dir_vec = vec(r.x,r.y) - vec(u.x,u.y)
-        # @unit_manager.unassign_resource(@unit, @res_id)
         @resource = nil
         @res_id = nil
         dir = dir_toward_resource(u, r)
         gather_command(@unit, dir) if dir
       elsif @resource
-        @unit_manager.assign_resource(@unit, @res_id)
+        if new_resource_target 
+          @unit_manager.assign_resource(@unit, @res_id)
+        end
+
         dir = dir_toward_resource(@unit, @resource)
         if dir
           move_command(@unit, dir)
         else
+          @unit_manager.unassign_resource(@unit, @res_id) if @res_id
           @resource = nil
+          puts 'cannot get to resource going rando'
           move_command(@unit, Game::DIR_VECS.keys.sample)
         end
       else

@@ -55,7 +55,7 @@ if $0 == __FILE__
           commands = game.generate_commands
 
           if update_count % 5 == 0
-            Printer.print(game.map, game.unit_manager.units)
+            # Printer.print(game.map, game.unit_manager.units)
           end
           server_connection.puts(Oj.dump(commands, mode: :compat))
         end

@@ -3,10 +3,13 @@ require_relative './vec'
 
 class Pathfinder
   def self.clear_cache!
+    puts "clearing paths! calculated #{@num_paths} / #{@cache_hits} since last clearing"
     @paths = nil
   end
 
   def self.path(units, map, from, to, close_enough=1, max_steps=1000)
+    @num_paths ||= 0
+    @cache_hits ||= 0
     if h(from, to) <= close_enough
       return []
     end
@@ -15,8 +18,10 @@ class Pathfinder
     to = to+map.offset
     if @paths[from].has_key?(to)
       cached_path = @paths[from][to]
+      @cache_hits += 1
       return cached_path ? cached_path.clone : nil
     end
+    @num_paths += 1
     return nil if @pathing
     # @pathing = true  # make them take turns w/ pathing
     steps = 0

@@ -7,13 +7,14 @@ class AssassinUnitManager < UnitManager
     tank_count = units_by_type("tank").size
     scout_count = units_by_type("scout").size
 
-    if worker_count < 10 
+    # 12,21 3300
+    if worker_count < 12 
       base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
     elsif scout_count < 1
       base.strategy = BuildIfYouCan.new(:scout, @map, base, self)
     elsif tank_count < 1
       base.strategy = BuildIfYouCan.new(:tank, @map, base, self)
-    elsif worker_count < 20
+    elsif worker_count < 21
       base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
     else
       base.strategy = Noop.new(@map, base, self)

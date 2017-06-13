@@ -39,9 +39,11 @@ class UnitManager
   def set_strategy(map, u)
   end
   
-  def update(updates)
+  def update(updates, turn)
     (updates.unit_updates || []).each do |uu|
       u = @units[uu.id] || Unit.new
+      $debug_file ||= File.open('debug.txt','w+')
+      $debug_file.puts "unit #{uu.id} idle on turn #{turn}" if uu.status == 'idle'
       update_attrs(u, uu)
       set_strategy(@map, u) unless u.strategy
       @units[uu.id] = u
