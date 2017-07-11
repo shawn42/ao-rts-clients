@@ -2,10 +2,11 @@ require_relative './lib/hash_object'
 
 class Unit
   attr_accessor :id, :type, :status, :x, :y, :can_attack, :health, :resource, :player_id,
+    :attack_type, :attack_damage, :attack_cooldown, :current_cooldown,
     :strategy
-  def command
+  def commands
     if @strategy && @strategy.has_command?
-      @strategy.command
+      @strategy.commands
     end
   end
 

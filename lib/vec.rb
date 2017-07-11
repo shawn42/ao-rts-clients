@@ -26,19 +26,23 @@ class Vec
     vec(x*scale,y*scale)
   end
 
+  def round
+    vec(x.round, y.round)
+  end
+
   def closest_cardinal()
     abs_vec = abs()
     if abs_vec.x >= abs_vec.y
       if abs_vec.x == 0
         vec(0, 0)
       else
-        vec(x / abs_vec.x, 0)
+        vec((x / abs_vec.x).round, 0)
       end
     else
       if abs_vec.y == 0
         vec(0, 0)
       else
-        vec(0, y / abs_vec.y)
+        vec(0, (y / abs_vec.y).round)
       end
     end
   end

@@ -1,6 +1,6 @@
 require_relative './lib/pathfinder'
 class Map
-  attr_reader :width, :height, :tiles
+  attr_reader :width, :height, :tiles, :resource_tiles
   def initialize(game_info)
     @game_info = game_info
     @width = game_info.width
@@ -72,7 +72,6 @@ class Map
         end
         update_tile_attrs(tile, tu)
         if tile.units.any?{|u|u['type'] == 'base'}
-          puts "WOOHOO. Found enemy base!"
           @enemy_base = tile 
         end
 

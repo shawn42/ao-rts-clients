@@ -8,7 +8,16 @@ class Strategy
   def has_command?
     false
   end
+  def commands
+    [command]
+  end
+  def command
+    # NO OP
+  end
   def update(*args)
+  end
+  def move_random
+    move_command(@unit, Game::DIR_VECS.keys.sample)
   end
   def dir_toward_resource(u, r)
     dir = dir_toward(u, r.x,r.y)
@@ -71,11 +80,38 @@ class Strategy
       dy: tile.y-u.y,
     }
   end
+  def identify_command(u,name)
+    {
+      command: "IDENTIFY",
+      unit: u.id,
+      name: name
+    }
+  end
   def create_command(type)
     {
       command: "CREATE",
       type: type,
     }
+  end
+end
+
+class CompositeStrategy < Strategy
+  def initialize(strat_map)
+    @strat_map = strat_map
+  end
+  def has_command?
+    @strat_map.values.any?{|strat|strat.has_command?}
+  end
+  def update(*args)
+    @strat_map.values.each{|strat|strat.update(*args)}
+  end
+  def command
+    @strat_map.keys.sort.each do |priority|
+      strat = @strat_map[priority]
+      if strat.has_command?
+        return strat.command
+      end
+    end
   end
 end
 
@@ -94,10 +130,132 @@ class BuildIfYouCan < Strategy
     create_command(@type)
   end
 end
+class RunAwayScared < Strategy
+  def has_command?
+    @unit.status == 'idle' && (!@enemies.empty? || @path)
+  end
+
+  def update(*args)
+    @enemies = enemies(@map, @unit)
+  end
+
+  # TODO move to parent class
+  def enemies(map, u)
+    r = u.type == 'scout' ? 5 : 2
+    x = u.x
+    y = u.y
+    baddies = []
+    ((x-r)..(x+r)).each do |tx|
+      ((y-r)..(y+r)).each do |ty|
+        t = map.trans_at(tx,ty)
+        next unless t
+
+        non_dead = t.units.select{|u|u['status'] != 'dead'}.map{|e|[HashObject.new(e), vec(tx,ty)]}
+        baddies.concat(non_dead)
+      end
+    end
+
+    baddies
+  end
+
+  def command
+    dir = nil
+    if @path && !@path.empty?
+      dir = @path.pop
+    else
+      @path = nil
+      avg_rel_enemy_loc = vec(0,0)
+      @enemies.each do |(e,e_pos)|
+        avg_rel_enemy_loc += vec(e_pos.x - @unit.x, e_pos.y - @unit.y)
+      end
+      if @enemies.size > 0
+        puts "FOUND ENEMIES TO RUN FROM!"
+        avg_rel_enemy_loc *= (1.0/@enemies.size)
+        safe_loc = avg_rel_enemy_loc.unit * 4
+        u_vec = vec(@unit.x, @unit.y)
+        tv = (u_vec - avg_rel_enemy_loc).round
+        dir = dir_toward(@unit, tv.x, tv.y, 0)
+        puts dir
+      end
+      # dir_vec = avg_rel_enemy_loc.closest_cardinal
+      # dir = Game::VEC_DIRS[dir_vec]
+    end
+    move_command(@unit, dir) if dir
+  end
+end
+
+class RunAwayIfHurt < Strategy
+  def has_command?
+    @unit.status == 'idle' && 
+      (@was_just_hurt && !@enemies.empty?) || @path
+  end
+
+  def update(*args)
+    @enemies = enemies(@map, @unit)
+    @was_just_hurt = @previous_health && @previous_health > @unit.health
+    puts "[#{@unit.id}] OUCH! #{@enemies.size}" if @was_just_hurt
+    @previous_health = @unit.health
+  end
+
+  def enemies(map, u)
+    r = u.type == 'scout' ? 5 : 2
+    x = u.x
+    y = u.y
+    baddies = []
+    ((x-r)..(x+r)).each do |tx|
+      ((y-r)..(y+r)).each do |ty|
+        t = map.trans_at(tx,ty)
+        next unless t
+
+        non_dead = t.units.select{|u|u['status'] != 'dead'}.map{|e|[HashObject.new(e), vec(tx,ty)]}
+        baddies.concat(non_dead)
+      end
+    end
+
+    baddies
+  end
+
+  def command
+    dir = nil
+    if @path && !@path.empty?
+      dir = @path.pop
+    else
+      @path = nil
+      avg_rel_enemy_loc = vec(0,0)
+      @enemies.each do |(e,e_pos)|
+        avg_rel_enemy_loc += vec(e_pos.x - @unit.x, e_pos.y - @unit.y)
+      end
+      if @enemies.size > 0
+        puts "FOUND ENEMIES TO RUN FROM!"
+        avg_rel_enemy_loc *= (1.0/@enemies.size)
+        safe_loc = avg_rel_enemy_loc.unit * 4
+        u_vec = vec(@unit.x, @unit.y)
+        tv = (u_vec - avg_rel_enemy_loc).round
+        dir = dir_toward(@unit, tv.x, tv.y, 0)
+        puts dir
+      end
+      # dir_vec = avg_rel_enemy_loc.closest_cardinal
+      # dir = Game::VEC_DIRS[dir_vec]
+    end
+    move_command(@unit, dir) if dir
+  end
+end
 
 class CollectNearestResource < Strategy
   def has_command?
     @unit.status == 'idle'
+  end
+
+  def commands
+    [command].tap do |cmds|
+      if @resource
+        cmds << identify_command(@unit, "#{@resource.x},#{@resource.y}") 
+      elsif @turning_in
+        cmds << identify_command(@unit, "H") 
+      else
+        cmds << identify_command(@unit, "?") 
+      end
+    end
   end
 
   def command
@@ -113,19 +271,21 @@ class CollectNearestResource < Strategy
     else
       @turning_in = false
       if @resource && @resource.resources.nil?
-        puts "resource ran out?"
+        # puts "resource ran out?"
         @unit_manager.unassign_resource(@unit, @res_id)
         @resource = nil 
         @res_id = nil
       end
-      @resource ||= best_resource(@unit)
+      @resource ||= self.class.best_resource(@unit, @unit_manager, @map)
       @res_id = @resource.resources.id if @resource
       adjacent_res = resource_adjacent(@unit, @resource)
 
       if @resource && adjacent_res && @resouce != adjacent_res
-        puts "found resource on way to other resource"
+        # puts "found resource on way to other resource"
         @unit_manager.unassign_resource(@unit, @res_id)
+      end
 
+      if adjacent_res
         @resource = adjacent_res
         r = @resource
         u = @unit
@@ -146,21 +306,22 @@ class CollectNearestResource < Strategy
           @unit_manager.unassign_resource(@unit, @res_id) if @res_id
           @resource = nil
           puts 'cannot get to resource going rando'
-          move_command(@unit, Game::DIR_VECS.keys.sample)
+          move_random
         end
       else
         # no resources? .. keep looking
-        move_command(@unit, Game::DIR_VECS.keys.sample)
+        # explore until resource
+        move_random
       end
     end
   end
 
-  def best_resource(u)
-    b = @unit_manager.units_by_type("base").first
+  def self.best_resource(u, unit_manager, map)
+    b = unit_manager.units_by_type("base").first
     tiles = []
-    @map.each_resource do |t|
+    map.each_resource do |t|
       r = t.resources
-      tiles << t if (r.total / r.value) > @unit_manager.resource_assignments(r.id).size
+      tiles << t if (r.total / r.value) > unit_manager.resource_assignments(r.id).size
     end
     # sorted = tiles.sort_by do |t|
     #   dx = (t.x-u.x).abs
@@ -184,18 +345,20 @@ class CollectNearestResource < Strategy
       value = t.resources.value
       value.to_f/total_dist 
     end
-    sorted = sorted.reverse[0..12].sort_by do |t|
+    # TODO how bad would it be to cache this on the resource?
+    sorted = sorted.reverse[0..10].sort_by do |t|
       # u_vec = vec(u.x,u.y)
       t_vec = vec(t.x,t.y)
       b_vec = vec(b.x,b.y)
 
-      # target_path = Pathfinder.path(@unit_manager.units, @map, u_vec, t_vec)
-      base_path = Pathfinder.path(@unit_manager.units, @map, b_vec, t_vec)
+      # target_path = Pathfinder.path(unit_manager.units, map, u_vec, t_vec)
+      base_path = Pathfinder.path(unit_manager.units, map, b_vec, t_vec)
       base_dist = base_path&.size || 9999
       # target_dist = target_path&.size || 9999
       # total_dist = target_dist + base_dist
+      total_dist = base_dist*2
       value = t.resources.value
-      value.to_f/base_dist*2
+      value.to_f/total_dist
     end
     sorted.last
   end
@@ -206,7 +369,7 @@ class MoveRandom < Strategy
     @unit.status == 'idle'
   end
   def command
-    move_command(@unit, Game::DIR_VECS.keys.sample)
+    move_random
   end
 end
 
@@ -262,12 +425,12 @@ class ExploreTheUnknown < Strategy
       end
     end
 
-    puts "Eww.. scout got stuck"
-    nil
+    move_random
   end
 
   def nearest_unknown(map, unit)
-    closest (@map.offset+vec(unit.x, unit.y)), @map.width do |v|
+    closest (map.offset+vec(unit.x, unit.y)), map.width do |v|
+    # closest map.offset, map.width do |v|
       t = map.at(v.x,v.y)
       if t && t.status == :known && !t.blocked
         map.neighbors_of(v).any? do |nv| 
@@ -277,6 +440,7 @@ class ExploreTheUnknown < Strategy
       else
         false
       end
+
     end
   end
 

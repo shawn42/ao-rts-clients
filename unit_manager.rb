@@ -53,7 +53,9 @@ class UnitManager
   end
 
   def commands
-    @units.values.map(&:command).compact
+    cmds = @units.values.flat_map(&:commands).compact
+    cmds << {command: 'IDENTIFY', name: 'MONKEY'}
+    cmds
   end
 
   def update_strategies
@@ -70,7 +72,8 @@ class UnitManager
   private
   def update_attrs(u, attrs)
     attrs.each do |k,v|
-      u.send("#{k}=", v)
+      attr_name = "#{k}="
+      u.send(attr_name, v) if u.respond_to? attr_name
     end
   end
 end

@@ -3,7 +3,7 @@ require_relative './vec'
 
 class Pathfinder
   def self.clear_cache!
-    puts "clearing paths! calculated #{@num_paths} / #{@cache_hits} since last clearing"
+    # puts "clearing paths! calculated #{@num_paths} / #{@cache_hits} since last clearing"
     @paths = nil
   end
 
