@@ -54,7 +54,7 @@ class UnitManager
 
   def commands
     cmds = @units.values.flat_map(&:commands).compact
-    cmds << {command: 'IDENTIFY', name: 'MONKEY'}
+    cmds << {command: 'IDENTIFY', name: self.class.name}
     cmds
   end
 

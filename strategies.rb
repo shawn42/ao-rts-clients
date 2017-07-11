@@ -27,9 +27,15 @@ class Strategy
 
     dir
   end
+
+  def dir_toward_enemy_base(u, b)
+    dir_toward(u, b.x,b.y, 1)
+  end
+
   def dir_toward_base(u)
     dir_toward(u, 0,0)#, 0) only needed if we have to walk under the base
   end
+
   def dir_toward(u, x,y, close_enough=1)
     if @path.nil? || @path.empty?
       @path = Pathfinder.path(@units, @map, vec(u.x,u.y), vec(x,y), close_enough) || []
@@ -78,6 +84,13 @@ class Strategy
       unit: u.id,
       dx: tile.x-u.x,
       dy: tile.y-u.y,
+    }
+  end
+  def melee_command(u,target)
+    {
+      command: "MELEE",
+      unit: u.id,
+      target: target['id'],
     }
   end
   def identify_command(u,name)
@@ -511,11 +524,11 @@ class FrontierPatrol < Strategy
     # TODO nice way to get enemies (eg enemy base)
     target = best_bang_for_buck(@map, @unit)
     if @unit.can_attack && target
-      attack_command(@unit, target) if target
+      @unit.type == 'tank' ? attack_command(@unit, target) : melee_command(@unit, target)
     else
       base = @map.enemy_base
       if base
-        move_command(@unit, dir_toward_resource(@unit, base))
+        move_command(@unit, dir_toward_enemy_base(@unit, base))
       else
         resource_tiles = []
         @map.each_resource do |r|
@@ -544,17 +557,18 @@ class FrontierPatrol < Strategy
         t = map.trans_at(tx,ty)
         next unless t
 
-        non_dead = t.units.select{|u|u['status'] != 'dead'}.size 
-        if non_dead > 0
+        non_dead = t.units.select{|u|u['status'] != 'dead'}
+        if non_dead.size > 0
           # TODO look up if we have units on this spot
-          targets << [non_dead, t]
+          targets << [non_dead.size, t, non_dead.first]
         end
 
       end
     end
 
     target = targets.sort_by{|t|t[0]}.last
-    target ? target[1] : nil
+    return nil if target.nil?
+    u.type == 'tank' ? target[1] : target[2]
   end
 end
 
