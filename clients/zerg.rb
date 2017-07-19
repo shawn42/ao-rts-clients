@@ -8,14 +8,8 @@ class ZergUnitManager < UnitManager
     scout_count = units_by_type("scout").size
 
     # 12,21 3300
-    if tank_count < 1
-      base.strategy = BuildIfYouCan.new(:tank, @map, base, self)
-    elsif worker_count < 2 
-      base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
-    elsif scout_count < 1
+    if scout_count < 1
       base.strategy = BuildIfYouCan.new(:scout, @map, base, self)
-    elsif tank_count < 1
-      base.strategy = BuildIfYouCan.new(:tank, @map, base, self)
     elsif worker_count < 21
       base.strategy = BuildIfYouCan.new(:worker, @map, base, self)
     else
@@ -31,7 +25,10 @@ class ZergUnitManager < UnitManager
     elsif u.type == 'tank'
       u.strategy = FrontierPatrol.new(map, u, self)
     elsif u.type == 'worker'
-      u.strategy = FrontierPatrol.new(map, u, self)
+      u.strategy = CompositeStrategy.new(
+         1 => FrontierPatrol.new(map, u, self),
+         2 => ExploreTheUnknown.new(map, u, self)
+      )
     end
   end
 end

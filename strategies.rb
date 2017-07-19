@@ -518,7 +518,7 @@ end
 
 class FrontierPatrol < Strategy
   def has_command?
-    @unit.status == 'idle'
+    @unit.status == 'idle' && @map.enemy_base
   end
   def command
     # TODO nice way to get enemies (eg enemy base)
