@@ -27,6 +27,16 @@ class Map
     @enemy_base
   end
 
+  def enemies_near_base
+    enemies = []
+    neighbors_of(vec(0,0)).each do |t|
+      trans_at(t.x,t.y).units.each do |u|
+        enemies << HashObject.new(u.merge(x:t.x, y:t.y)) if u['status'] != 'dead'
+      end
+    end
+    enemies
+  end
+
   def neighbors_of(loc)
     ns = Game::DIR_VECS.values.map do |v| 
       n_loc = loc + v

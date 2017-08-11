@@ -29,7 +29,7 @@ class AssassinUnitManager < UnitManager
     elsif u.type == 'scout'
       u.strategy = ExploreTheUnknown.new(map, u, self)
     elsif u.type == 'tank'
-      u.strategy = FrontierPatrol.new(map, u, self)
+      u.strategy = KillBase.new(map, u, self)
     elsif u.type == 'worker'
       u.strategy = CollectNearestResource.new(map, u, self)
     end
