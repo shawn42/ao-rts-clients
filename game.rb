@@ -54,8 +54,9 @@ class Game
     puts manager_klass
     @manager_klass = manager_klass
   end
-  def setup(msg)
-    @game_info = HashObject.new width: 32, height: 32
+
+  def setup(game_info)
+    @game_info = game_info
     @map = Map.new @game_info
     @unit_manager = @manager_klass.new @game_info, @map
   end

@@ -17,6 +17,7 @@ class Strategy
   def update(*args)
   end
   def move_random
+    # TODO check map for validity of move
     move_command(@unit, Game::DIR_VECS.keys.sample)
   end
   def dir_toward_resource(u, r)
@@ -118,11 +119,12 @@ class CompositeStrategy < Strategy
   def update(*args)
     @strat_map.values.each{|strat|strat.update(*args)}
   end
-  def command
+
+  def commands
     @strat_map.keys.sort.each do |priority|
       strat = @strat_map[priority]
       if strat.has_command?
-        return strat.command
+        return strat.commands
       end
     end
   end
