@@ -3,8 +3,8 @@ class Map
   attr_reader :width, :height, :tiles, :resource_tiles
   def initialize(game_info)
     @game_info = game_info
-    @width = game_info.width
-    @height = game_info.height
+    @width = game_info.map_width
+    @height = game_info.map_height
     @tiles = Array.new(height*2){Array.new(width*2){Tile.new}}
     @resource_tiles = Set.new
   end
@@ -25,6 +25,16 @@ class Map
 
   def enemy_base
     @enemy_base
+  end
+
+  def enemies_near_base
+    enemies = []
+    neighbors_of(vec(0,0)).each do |t|
+      trans_at(t.x,t.y).units.each do |u|
+        enemies << HashObject.new(u.merge(x:t.x, y:t.y)) if u['status'] != 'dead'
+      end
+    end
+    enemies
   end
 
   def neighbors_of(loc)
@@ -61,6 +71,8 @@ class Map
     tile_updated = false
     (updates.tile_updates || []).each do |tu|
       tile = trans_at(tu.x,tu.y)
+      # no tile means it's off the possible map
+      next unless tile
 
       if tu.visible
         resource_was_removed = false

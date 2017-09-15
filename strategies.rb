@@ -17,6 +17,7 @@ class Strategy
   def update(*args)
   end
   def move_random
+    # TODO check map for validity of move
     move_command(@unit, Game::DIR_VECS.keys.sample)
   end
   def dir_toward_resource(u, r)
@@ -118,11 +119,12 @@ class CompositeStrategy < Strategy
   def update(*args)
     @strat_map.values.each{|strat|strat.update(*args)}
   end
-  def command
+
+  def commands
     @strat_map.keys.sort.each do |priority|
       strat = @strat_map[priority]
       if strat.has_command?
-        return strat.command
+        return strat.commands
       end
     end
   end
@@ -336,17 +338,27 @@ class CollectNearestResource < Strategy
       r = t.resources
       tiles << t if (r.total / r.value) > unit_manager.resource_assignments(r.id).size
     end
-    # sorted = tiles.sort_by do |t|
-    #   dx = (t.x-u.x).abs
-    #   dy = (t.y-u.y).abs
 
-    #   base_dx = (t.x-b.x).abs
-    #   base_dy = (t.y-b.y).abs
 
-    #   total_dist = dx+dy+base_dx+base_dy
-    #   value = t.resources.value
-    #   value.to_f/total_dist 
-    # end
+    best_tile = nil
+    best_path_value = 0
+    tiles.each do |t|
+      dx = (t.x-u.x).abs
+      dy = (t.y-u.y).abs
+
+      base_dx = (t.x-b.x).abs
+      base_dy = (t.y-b.y).abs
+
+      total_dist = dx+dy+base_dx+base_dy
+      value = t.resources.value
+      path_value = value.to_f/total_dist 
+
+      if path_value > best_path_value
+        best_path_value = path_value
+        best_tile = t
+      end
+    end
+
     sorted = tiles.sort_by do |t|
       dx = (t.x-u.x).abs
       dy = (t.y-u.y).abs
@@ -365,7 +377,7 @@ class CollectNearestResource < Strategy
       b_vec = vec(b.x,b.y)
 
       # target_path = Pathfinder.path(unit_manager.units, map, u_vec, t_vec)
-      base_path = Pathfinder.path(unit_manager.units, map, b_vec, t_vec)
+      base_path = Pathfinder.path(unit_manager.units, map, t_vec, b_vec)
       base_dist = base_path&.size || 9999
       # target_dist = target_path&.size || 9999
       # total_dist = target_dist + base_dist
@@ -516,7 +528,31 @@ class Explore < Strategy
 
 end
 
-class FrontierPatrol < Strategy
+class DefendBase < Strategy
+  def has_command?
+    enemies = @map.enemies_near_base
+    @unit.x.abs < 10 && @unit.y.abs < 10 && enemies.size > 0
+  end
+
+  def commands
+    [command].tap do |cmds|
+      cmds << identify_command(@unit, "!") 
+    end
+  end
+
+  def command
+    target = @map.enemies_near_base.first
+    range = @unit.type == 'tank' ? 2 : 1
+    dist = (vec(target.x,target.y) - vec(@unit.x,@unit.y)).magnitude
+    if @unit.can_attack && dist <= range
+      @unit.type == 'tank' ? attack_command(@unit, vec(target.x,target.y)) : melee_command(@unit, target)
+    else
+      move_command(@unit, dir_toward(@unit, target.x, target.y, range))
+    end
+  end
+end
+
+class KillBase < Strategy
   def has_command?
     @unit.status == 'idle' && @map.enemy_base
   end

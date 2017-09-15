@@ -23,8 +23,6 @@ if $0 == __FILE__
       puts "CONNECTED"
 
       game = Game.new Object.const_get("#{strat.capitalize}UnitManager")
-      game.setup(:todo_header_msg)
-
       msg_from_server = Queue.new
 
       listening_thread = Thread.new do
@@ -37,6 +35,7 @@ if $0 == __FILE__
 
       begin
         update_count = 0
+        
         loop do
           msg = msg_from_server.pop
           msgs = [msg]
@@ -49,6 +48,9 @@ if $0 == __FILE__
             update_count += 1
             updates = Oj.load(msg)
             update_obj = HashObject.new updates
+            if update_obj.game_info
+              game.setup(update_obj.game_info)
+            end
             game.update(update_obj)
           end
 

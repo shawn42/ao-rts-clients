@@ -23,10 +23,10 @@ class ZergUnitManager < UnitManager
     elsif u.type == 'scout'
       u.strategy = ExploreTheUnknown.new(map, u, self)
     elsif u.type == 'tank'
-      u.strategy = FrontierPatrol.new(map, u, self)
+      u.strategy = KillBase.new(map, u, self)
     elsif u.type == 'worker'
       u.strategy = CompositeStrategy.new(
-         1 => FrontierPatrol.new(map, u, self),
+         1 => KillBase.new(map, u, self),
          2 => ExploreTheUnknown.new(map, u, self)
       )
     end

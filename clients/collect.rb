@@ -56,7 +56,12 @@ class CollectUnitManager < UnitManager
     elsif u.type == 'scout'
       u.strategy = ExploreTheUnknown.new(map, u, self)
     elsif u.type == 'worker'
-      u.strategy = CollectNearestResource.new(map, u, self)
+      # u.strategy = CollectNearestResource.new(map, u, self)
+      u.strategy = CompositeStrategy.new(
+        1 => DefendBase.new(map, u, self),
+        # 2 => RunAwayScared.new(map, u, self),
+        3 => CollectNearestResource.new(map, u, self)
+      )
 
       # u.strategy = CompositeStrategy.new(
       #   1 => RunAwayScared.new(map, u, self),
