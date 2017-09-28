@@ -460,7 +460,7 @@ class ExploreTheUnknown < Strategy
       if t && t.status == :known && !t.blocked
         map.neighbors_of(v).any? do |nv| 
           nt = map.at(nv.x, nv.y)
-          nt && nt.status == :unknown
+          nt && nt.status == :unknown && Pathfinder.path(@units, @map, vec(t.x, t.y), vec(unit.x, unit.y))
         end
       else
         false
