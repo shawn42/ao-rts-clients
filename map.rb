@@ -27,10 +27,30 @@ class Map
     @enemy_base
   end
 
+  def base_check_tiles
+    dirs = [
+      vec(-1,-1),
+      vec(-1,0),
+      vec(-1,1),
+
+      vec(1,-1),
+      vec(1,0),
+      vec(1,1),
+
+      vec(0,-1),
+      vec(0,1),
+
+      vec(0,0),
+    ]
+    dirs.map do |d|
+      trans_at(d.x,d.y)
+    end.compact
+  end
+
   def enemies_near_base
     enemies = []
-    neighbors_of(vec(0,0)).each do |t|
-      trans_at(t.x,t.y).units.each do |u|
+    base_check_tiles.each do |t|
+      t.units.each do |u|
         enemies << HashObject.new(u.merge(x:t.x, y:t.y)) if u['status'] != 'dead'
       end
     end

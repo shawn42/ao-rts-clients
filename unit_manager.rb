@@ -45,6 +45,7 @@ class UnitManager
       $debug_file ||= File.open('debug.txt','w+')
       $debug_file.puts "unit #{uu.id} idle on turn #{turn}" if uu.status == 'idle'
       update_attrs(u, uu)
+      next if uu.status == 'dead'
       set_strategy(@map, u) unless u.strategy
       @units[uu.id] = u
     end

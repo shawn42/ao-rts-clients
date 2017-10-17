@@ -530,8 +530,10 @@ end
 
 class DefendBase < Strategy
   def has_command?
-    enemies = @map.enemies_near_base
-    @unit.x.abs < 10 && @unit.y.abs < 10 && enemies.size > 0
+    @enemies = @map.enemies_near_base
+    should_defend = @unit.x.abs < 10 && @unit.y.abs < 10 && @enemies.size > 0
+    # puts "DEFEND THE BASE!!" if should_defend
+    should_defend
   end
 
   def commands
@@ -541,7 +543,7 @@ class DefendBase < Strategy
   end
 
   def command
-    target = @map.enemies_near_base.first
+    target = @enemies.first
     range = @unit.type == 'tank' ? 2 : 1
     dist = (vec(target.x,target.y) - vec(@unit.x,@unit.y)).magnitude
     if @unit.can_attack && dist <= range
@@ -554,29 +556,18 @@ end
 
 class KillBase < Strategy
   def has_command?
-    @unit.status == 'idle' && @map.enemy_base
+    @unit.status == 'idle' && @map.enemy_base # || @map.enemy_next_to(@unit)
   end
+
   def command
-    # TODO nice way to get enemies (eg enemy base)
+    base = @map.enemy_base
     target = best_bang_for_buck(@map, @unit)
+
     if @unit.can_attack && target
       @unit.type == 'tank' ? attack_command(@unit, target) : melee_command(@unit, target)
     else
-      base = @map.enemy_base
       if base
         move_command(@unit, dir_toward_enemy_base(@unit, base))
-      else
-        resource_tiles = []
-        @map.each_resource do |r|
-          resource_tiles << r
-        end
-        farthest = resource_tiles.sort_by do |t|
-          dx = (t.x).abs
-          dy = (t.y).abs
-          dx + dy
-        end.last
-        @resource = farthest
-        move_command(@unit, dir_toward_resource(@unit, @resource)) if @resource
       end
     end
   end
@@ -596,7 +587,8 @@ class KillBase < Strategy
         non_dead = t.units.select{|u|u['status'] != 'dead'}
         if non_dead.size > 0
           # TODO look up if we have units on this spot
-          targets << [non_dead.size, t, non_dead.first]
+          score = non_dead.size
+          targets << [score, t, non_dead.first]
         end
 
       end
