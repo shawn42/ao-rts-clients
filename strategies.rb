@@ -16,10 +16,18 @@ class Strategy
   end
   def update(*args)
   end
+
   def move_random
-    # TODO check map for validity of move
-    move_command(@unit, Game::DIR_VECS.keys.sample)
+    u_vec = vec(@unit.x, @unit.y)
+    dir = Game::DIR_VECS.keys.shuffle.find do |d|
+      dir_v = Game::DIR_VECS[d]
+      new_loc = u_vec + dir_v
+      t = @map.trans_at(new_loc.x, new_loc.y)
+      t && !t.blocked
+    end
+    move_command(@unit, dir[0]) if dir
   end
+
   def dir_toward_resource(u, r)
     dir = dir_toward(u, r.x,r.y)
     if dir == nil
@@ -532,7 +540,7 @@ class DefendBase < Strategy
   def has_command?
     @enemies = @map.enemies_near_base
     should_defend = @unit.x.abs < 10 && @unit.y.abs < 10 && @enemies.size > 0
-    # puts "DEFEND THE BASE!!" if should_defend
+    # puts "DEFEND THE BASE!! #{Time.now.to_i}" if should_defend
     should_defend
   end
 

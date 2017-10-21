@@ -50,8 +50,8 @@ class Map
   def enemies_near_base
     enemies = []
     base_check_tiles.each do |t|
-      t.units.each do |u|
-        enemies << HashObject.new(u.merge(x:t.x, y:t.y)) if u['status'] != 'dead'
+      t.units.select{|u|u['status'] != 'dead'}.each do |u|
+        enemies << HashObject.new(u.merge(x:t.x, y:t.y))
       end
     end
     enemies
