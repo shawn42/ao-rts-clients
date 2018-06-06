@@ -1,10 +1,11 @@
 class UnitManager
-  attr_reader :units
+  attr_reader :units, :brigades
   def initialize(game_info, map)
     @game_info = game_info
     @map = map
     @units = {}
     @res_assignments ||= {}
+    @brigades = []
   end
 
   def unit(id)

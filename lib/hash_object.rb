@@ -1,20 +1,13 @@
+require 'forwardable'
 class HashObject
+  extend Forwardable
+  def_delegators :@hash, :[], :[]=, :each, :to_s
+
   def initialize(hash)
     @hash = {}
     hash.each do |k,v|
       @hash[k.to_s] = v
     end
-  end
-
-  def each(&blk)
-    @hash.each &blk
-  end
-
-  def []=(k,v)
-    @hash[k.to_s] = v
-  end
-  def [](k)
-    @hash[k.to_s]
   end
 
   def method_missing(name, *args)

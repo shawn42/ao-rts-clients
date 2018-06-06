@@ -78,6 +78,15 @@ class Strategy
       dir: dir,
     }
   end
+  def drop_command(u, dir, value)
+    return if dir.nil?
+    {
+      command: "DROP",
+      unit: u.id,
+      dir: dir,
+      value: value
+    }
+  end
   def move_command(u, dir)
     return if dir.nil?
     {
@@ -285,8 +294,8 @@ class CollectNearestResource < Strategy
     new_resource_target = @resource.nil?
 
     if @unit.resource > 0 && !@turning_in
-      @turning_in = true
       @path = nil
+      @turning_in = true
     end
 
     if @unit.resource > 0
@@ -301,8 +310,8 @@ class CollectNearestResource < Strategy
       end
       @resource ||= self.class.best_resource(@unit, @unit_manager, @map)
       @res_id = @resource.resources.id if @resource
-      adjacent_res = resource_adjacent(@unit, @resource)
 
+      adjacent_res = resource_adjacent(@unit, @resource)
       if @resource && adjacent_res && @resouce != adjacent_res
         # puts "found resource on way to other resource"
         @unit_manager.unassign_resource(@unit, @res_id)
@@ -339,14 +348,15 @@ class CollectNearestResource < Strategy
     end
   end
 
-  def self.best_resource(u, unit_manager, map)
-    b = unit_manager.units_by_type("base").first
+  def self.best_resource(u, unit_manager, map, res_to_ignore=Set.new)
+    b = unit_manager.base
     tiles = []
     map.each_resource do |t|
       r = t.resources
-      tiles << t if (r.total / r.value) > unit_manager.resource_assignments(r.id).size
+      if !res_to_ignore.include?(r.id) && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
+        tiles << t 
+      end
     end
-
 
     best_tile = nil
     best_path_value = 0
@@ -396,6 +406,72 @@ class CollectNearestResource < Strategy
     sorted.last
   end
 end
+
+
+require_relative 'brigade'
+class BucketBrigadeCollector < CollectNearestResource
+  STATES = [:no_brigade,:moving,:gathering,:dropping]
+
+  def command
+    @state ||= :no_brigade
+
+    command = nil
+    case @state
+    when :no_brigade
+      partial_brigade = @unit_manager.brigades.select(&:needs_help?).first
+      if partial_brigade
+        partial_brigade.units << @unit
+        @brigade = partial_brigade
+        @target = partial_brigade.position_for(@unit)
+        @state = :moving
+      else
+        resources_to_ignore = @unit_manager.brigades.map(&:resource).
+          map(&:resources).compact.map{|r|r["id"]}
+
+        resource = self.class.best_resource(@unit, @unit_manager, @map, resources_to_ignore)
+        if resource
+          @brigade = Brigade.new(resource, @map, @unit_manager.base)
+          @brigade.units << @unit
+          @unit_manager.brigades << @brigade
+
+          @target = @brigade.position_for(@unit)
+          @state = :moving
+        else
+          puts "RANDO BUCKETS"
+          command = move_random
+        end
+      end
+    when :moving
+      u_vec = vec(@unit.x, @unit.y)
+      if u_vec == @target
+        @state = :gathering
+      else
+        dir = dir_toward(@unit, @target.x, @target.y, 0)
+        command = move_command(@unit, dir)
+      end
+    when :gathering
+      dir = @brigade.dir_to_gather(@unit)
+      command = gather_command(@unit, dir)
+      @state = :dropping
+    when :dropping
+      dir = @brigade.dir_to_drop(@unit)
+      if dir
+        command = drop_command(@unit, dir, 20)
+      else
+        @state = :gathering
+      end
+
+      if @brigade.unit_done?(@unit)
+        @state = :no_brigade
+      else
+        @state = :gathering
+      end
+    end
+
+    command
+  end
+end
+
 
 class MoveRandom < Strategy
   def has_command?
@@ -587,7 +663,7 @@ class KillBase < Strategy
     targets = []
     ((x-r)..(x+r)).each do |tx|
       ((y-r)..(y+r)).each do |ty|
-        next if u.type == 'tank' && (tx == x && ty == y) # don't shoot self
+        # next if u.type == 'tank' && (tx == x && ty == y) # don't shoot self
 
         t = map.trans_at(tx,ty)
         next unless t
@@ -595,7 +671,7 @@ class KillBase < Strategy
         non_dead = t.units.select{|u|u['status'] != 'dead'}
         if non_dead.size > 0
           # TODO look up if we have units on this spot
-          score = non_dead.size
+          score = non_dead.size # TODO: balance with own loss of life
           targets << [score, t, non_dead.first]
         end
 
@@ -605,6 +681,17 @@ class KillBase < Strategy
     target = targets.sort_by{|t|t[0]}.last
     return nil if target.nil?
     u.type == 'tank' ? target[1] : target[2]
+  end
+end
+
+class ProtectBase < KillBase
+  def command
+    base = @map.enemy_base
+    target = best_bang_for_buck(@map, @unit)
+
+    if @unit.can_attack && target
+      @unit.type == 'tank' ? attack_command(@unit, target) : melee_command(@unit, target)
+    end
   end
 end
 

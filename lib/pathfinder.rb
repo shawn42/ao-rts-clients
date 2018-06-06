@@ -7,7 +7,7 @@ class Pathfinder
     @paths = nil
   end
 
-  def self.path(units, map, from, to, close_enough=1, max_steps=1000)
+  def self.path(units, map, from, to, close_enough=1, max_steps=1000, translate_to_moves=true)
     @num_paths ||= 0
     @cache_hits ||= 0
     if h(from, to) <= close_enough
@@ -16,7 +16,7 @@ class Pathfinder
     @paths ||= Hash.new{|h,k| h[k] = {}}
     from = from+map.offset
     to = to+map.offset
-    if @paths[from].has_key?(to)
+    if @paths[from].has_key?(to) && translate_to_moves
       cached_path = @paths[from][to]
       @cache_hits += 1
       return cached_path ? cached_path.clone : nil
@@ -41,7 +41,7 @@ class Pathfinder
       gh = price_map[loc]
       steps += 1
       if h(loc, to) <= close_enough
-        instructions = build_path(parent_map, loc)
+        instructions = build_path(parent_map, loc, translate_to_moves)
         @paths[from][to] = instructions.clone
         @pathing = false
         return instructions
@@ -77,19 +77,29 @@ class Pathfinder
     return nil
   end
 
-  def self.build_path(parents, loc)
+  def self.build_path(parents, loc, translate=true)
     path = [loc]
     while loc = parents[loc]
       path << loc
     end
     path = path.reverse
-    dirs = []
-    last_loc = path[0]
-    path[1..-1].each do |loc|
-      dirs << dir_toward(last_loc, loc)
-      last_loc = loc
+    if translate
+      dirs = []
+      last_loc = path[0]
+      path[1..-1].each do |loc|
+        dirs << dir_toward(last_loc, loc)
+        last_loc = loc
+      end
+      dirs
+    else
+      coords = []
+      last_loc = path[0]
+      path[1..-1].each do |loc|
+        coords << (loc - path[0])
+        last_loc = loc
+      end
+      coords
     end
-    dirs
   end
 
   def self.h(from, target)
@@ -99,6 +109,7 @@ class Pathfinder
   end
 
   def self.dir_toward(from, to)
-    Game::VEC_DIRS[vec(to.x-from.x, to.y-from.y)][0]
+    v = vec(to.x-from.x, to.y-from.y).unit
+    Game::VEC_DIRS[vec(v.x.to_i, v.y.to_i)][0]
   end
 end

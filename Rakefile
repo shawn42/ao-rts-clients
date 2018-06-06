@@ -16,6 +16,12 @@ task :collect, [:port] do |t, args|
   sh "ruby runner.rb collect #{port}"
 end
 
+desc "Bucket Brigade"
+task :brigade, [:port] do |t, args|
+  port = args[:port] || 9090
+  sh "ruby runner.rb brigade #{port}"
+end
+
 task default: "assassing[9090]"
 
 

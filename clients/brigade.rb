@@ -1,7 +1,7 @@
 require_relative '../unit_manager'
 
 # main idea: collect as quickly as we can
-class CollectUnitManager < UnitManager
+class BrigadeUnitManager < UnitManager
   def should_build_scout?
     workers = units_by_type("worker").select(&:alive?)
     scouts = units_by_type("scout").select(&:alive?)
@@ -16,7 +16,7 @@ class CollectUnitManager < UnitManager
 
   def should_build_worker?
     return false
-    res = CollectNearestResource.best_resource(vec(0,0), self, @map)
+    res = BucketBrigadeCollector.best_resource(vec(0,0), self, @map)
     if res
       path = Pathfinder.path(units, @map, vec(0,0), vec(res.x, res.y))
       if path
@@ -63,12 +63,12 @@ class CollectUnitManager < UnitManager
     elsif u.type == 'tank'
       u.strategy = ProtectBase.new(map, u, self)
     elsif u.type == 'worker'
-      # u.strategy = CollectNearestResource.new(map, u, self)
-      u.strategy = CompositeStrategy.new(
-        1 => DefendBase.new(map, u, self),
-        # 2 => RunAwayScared.new(map, u, self),
-        3 => CollectNearestResource.new(map, u, self)
-      )
+      u.strategy = BucketBrigadeCollector.new(map, u, self)
+      # u.strategy = CompositeStrategy.new(
+      #   1 => DefendBase.new(map, u, self),
+      #   # 2 => RunAwayScared.new(map, u, self),
+      #   3 => BucketBrigadeCollector.new(map, u, self)
+      # )
 
       # u.strategy = CompositeStrategy.new(
       #   1 => RunAwayScared.new(map, u, self),

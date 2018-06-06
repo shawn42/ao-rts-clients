@@ -74,7 +74,6 @@ class Game
   def generate_commands
     @unit_manager.update_strategies
     cmds = @unit_manager.commands.compact
-    # puts cmds.inspect unless cmds.empty?
     {commands: cmds, client_turn: @turn}
   end
 end
