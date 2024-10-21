@@ -9,6 +9,14 @@ class Map
     @resource_tiles = Set.new
   end
 
+  def reserve(x,y,token)
+    at(x+@width, y+@height).reserved_for = token
+  end
+
+  def release(x,y)
+    at(x+@width, y+@height).reserved_for = nil
+  end
+
   def at(x,y)
     return nil if x < 0 || y < 0 || x > @width*2 || y > @height*2
     col = @tiles[x]
@@ -60,7 +68,7 @@ class Map
   def neighbors_of(loc)
     ns = Game::DIR_VECS.values.map do |v| 
       n_loc = loc + v
-      t = at(n_loc.x, n_loc.y) ? n_loc : nil
+      at(n_loc.x, n_loc.y) ? n_loc : nil
     end.compact
     ns
   end
@@ -88,7 +96,7 @@ class Map
   end
 
   def update(updates)
-    tile_updated = false
+    any_tiles_updated = false
     (updates.tile_updates || []).each do |tu|
       tile = trans_at(tu.x,tu.y)
       # no tile means it's off the possible map
@@ -107,17 +115,20 @@ class Map
           @enemy_base = tile 
         end
 
-        tile_updated = tile_updated || ((was_unknown && tile.status != :unknown) || resource_was_removed)
+        any_tiles_updated = any_tiles_updated || ((was_unknown && tile.status != :unknown) || resource_was_removed)
       else
         tile.visible = false
       end
     end
-    Pathfinder.clear_cache! if tile_updated
+    Pathfinder.clear_cache! if any_tiles_updated
+  end
+
+  def resources_at(x, y)
+    trans_at(x, y)&.resources
   end
 
   private
   def update_tile_attrs(tile, attrs)
-    # TODO resource/unit classes
     tile.status = :known
     attrs.each do |k,v|
       tile.send("#{k}=", v)

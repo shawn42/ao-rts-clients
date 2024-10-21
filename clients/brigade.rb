@@ -2,6 +2,14 @@ require_relative '../unit_manager'
 
 # main idea: collect as quickly as we can
 class BrigadeUnitManager < UnitManager
+  attr_reader :brigades
+
+  def initialize(game_info, map)
+    super
+    @brigades = []
+    @max_brigade_workers_needed = 0
+  end
+
   def should_build_scout?
     workers = units_by_type("worker").select(&:alive?)
     scouts = units_by_type("scout").select(&:alive?)
@@ -11,30 +19,41 @@ class BrigadeUnitManager < UnitManager
   end
   def should_build_tank?
     return false
-    units_by_type("tank").select(&:alive?).size < 1
+    #units_by_type("tank").select(&:alive?).size < 1
   end
 
-  def should_build_worker?
-    return false
-    res = BucketBrigadeCollector.best_resource(vec(0,0), self, @map)
-    if res
-      path = Pathfinder.path(units, @map, vec(0,0), vec(res.x, res.y))
-      if path
-        build_worker_turns = 5
-        turns_per_move = 5
-        cost_of_worker = 100
-        roundtrip_turns = path.size*2*turns_per_move+1
-        val = res.resources.value
-        total = res.resources.total
-
-        trips_to_pay_off = cost_of_worker.to_f / val
-        ms_per_turn = 200
-        turns_left = @game_info[:time_remaining] / ms_per_turn
-
-        return total > cost_of_worker && (trips_to_pay_off * roundtrip_turns) < turns_left
-      end
+  def clear_finished_brigades!
+    @max_brigade_workers_needed = @brigades.map(&:max_workers).max || 0
+    @brigades.each do |brigade|
+      brigade.destroy! if brigade.done?
     end
-    false
+    @brigades.reject!(&:done?)
+  end
+
+
+  def should_build_worker?
+    @max_brigade_workers_needed > units_by_type("worker").select(&:alive?).size
+
+    # return false
+    # res = BucketBrigadeCollector.best_resource(vec(0,0), self, @map)
+    # if res
+    #   path = Pathfinder.path(units, @map, vec(0,0), vec(res.x, res.y))
+    #   if path
+    #     build_worker_turns = 5
+    #     turns_per_move = 5
+    #     cost_of_worker = 100
+    #     roundtrip_turns = path.size*2*turns_per_move+1
+    #     val = res.resources.value
+    #     total = res.resources.total
+
+    #     trips_to_pay_off = cost_of_worker.to_f / val
+    #     ms_per_turn = 200
+    #     turns_left = @game_info[:time_remaining] / ms_per_turn
+
+    #     return total > cost_of_worker && (trips_to_pay_off * roundtrip_turns) < turns_left
+    #   end
+    # end
+    # false
   end
 
   def update_overall_strategy

@@ -1,11 +1,10 @@
 class UnitManager
-  attr_reader :units, :brigades
+  attr_reader :units
   def initialize(game_info, map)
     @game_info = game_info
     @map = map
     @units = {}
     @res_assignments ||= {}
-    @brigades = []
   end
 
   def unit(id)
@@ -43,8 +42,8 @@ class UnitManager
   def update(updates, turn)
     (updates.unit_updates || []).each do |uu|
       u = @units[uu.id] || Unit.new
-      $debug_file ||= File.open('debug.txt','w+')
-      $debug_file.puts "unit #{uu.id} idle on turn #{turn}" if uu.status == 'idle'
+      # $debug_file ||= File.open('debug.txt','w+')
+      # $debug_file.puts "unit #{uu.id} idle on turn #{turn}" if uu.status == 'idle'
       update_attrs(u, uu)
       next if uu.status == 'dead'
       set_strategy(@map, u) unless u.strategy

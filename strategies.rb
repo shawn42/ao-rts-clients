@@ -153,7 +153,7 @@ end
 class BuildIfYouCan < Strategy
   def initialize(type, *args)
     @type = type
-    super *args
+    super(*args)
   end
   def has_command?
     @unit.status == 'idle' && @unit.resource > Game::COSTS[@type]
@@ -411,16 +411,33 @@ end
 require_relative 'brigade'
 class BucketBrigadeCollector < CollectNearestResource
   STATES = [:no_brigade,:moving,:gathering,:dropping]
+  attr_accessor :target, :state
 
-  def command
+  def commands
     @state ||= :no_brigade
+
+    brigade_index = ""
+    brigade_pos = ""
+
+
+    # TODO: move this somewhere not dumb
+    @unit_manager.clear_finished_brigades!
+
+    resource = self.class.best_resource(@unit, @unit_manager, @map)
+    return nil unless resource
+
+    if @state == :no_brigade && @unit_manager.brigades.size >= 1 &&
+      @unit_manager.brigades.select(&:needs_help?).empty?
+      return nil
+    end
+
 
     command = nil
     case @state
     when :no_brigade
       partial_brigade = @unit_manager.brigades.select(&:needs_help?).first
       if partial_brigade
-        partial_brigade.units << @unit
+        partial_brigade.add_unit(@unit)
         @brigade = partial_brigade
         @target = partial_brigade.position_for(@unit)
         @state = :moving
@@ -431,28 +448,43 @@ class BucketBrigadeCollector < CollectNearestResource
         resource = self.class.best_resource(@unit, @unit_manager, @map, resources_to_ignore)
         if resource
           @brigade = Brigade.new(resource, @map, @unit_manager.base)
-          @brigade.units << @unit
+          @brigade.add_unit(@unit)
           @unit_manager.brigades << @brigade
 
           @target = @brigade.position_for(@unit)
           @state = :moving
         else
           puts "RANDO BUCKETS"
-          command = move_random
+          command = nil#move_random
         end
       end
     when :moving
       u_vec = vec(@unit.x, @unit.y)
-      if u_vec == @target
-        @state = :gathering
+      if u_vec == @target 
+        if @brigade.done?
+          @state = :no_brigade
+        else
+          @state = :gathering
+        end
       else
         dir = dir_toward(@unit, @target.x, @target.y, 0)
         command = move_command(@unit, dir)
       end
     when :gathering
       dir = @brigade.dir_to_gather(@unit)
-      command = gather_command(@unit, dir)
-      @state = :dropping
+      gather_loc = @brigade.gather_loc(@unit)
+      if @map.resources_at(gather_loc.x, gather_loc.y)
+        command = gather_command(@unit, dir)
+        @state = :dropping
+      elsif @brigade.unit_done?(@unit)
+        if @brigade.reassign(@unit)
+          @target = @brigade.position_for(@unit)
+          @state = :moving
+        else
+          @brigade = nil
+          @state = :no_brigade
+        end
+      end
     when :dropping
       dir = @brigade.dir_to_drop(@unit)
       if dir
@@ -461,14 +493,20 @@ class BucketBrigadeCollector < CollectNearestResource
         @state = :gathering
       end
 
-      if @brigade.unit_done?(@unit)
+      # TODO optimization to release workers early... for now.. evaluate the whole brigade
+      if @brigade.done?
         @state = :no_brigade
       else
         @state = :gathering
       end
+    else
+      # something went wrong
+      command = nil
     end
 
-    command
+    name = "#{brigade_index}.#{brigade_pos}.#{@state[0]}"
+    ident = identify_command(@unit, name)
+    [command, ident].compact
   end
 end
 

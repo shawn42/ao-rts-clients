@@ -7,7 +7,7 @@ class Pathfinder
     @paths = nil
   end
 
-  def self.path(units, map, from, to, close_enough=1, max_steps=1000, translate_to_moves=true)
+  def self.path(units, map, from, to, close_enough=1, max_steps=1000, translate_to_moves=true, reservation_token=nil)
     @num_paths ||= 0
     @cache_hits ||= 0
     if h(from, to) <= close_enough
@@ -50,7 +50,7 @@ class Pathfinder
       closed << loc
       map.neighbors_of(loc).each do |n|
         t = map.at(n.x, n.y)
-        if t && (t.blocked || t.status == :unknown)
+        if t && (t.blocked || t.status == :unknown || (t.reserved_for && reservation_token != t.reserved_for))
           closed << n 
         end
         unless closed.include?(n)
@@ -110,6 +110,8 @@ class Pathfinder
 
   def self.dir_toward(from, to)
     v = vec(to.x-from.x, to.y-from.y).unit
-    Game::VEC_DIRS[vec(v.x.to_i, v.y.to_i)][0]
+    dir = vec(v.x.to_i, v.y.to_i)
+    # puts "Dir: #{from} #{to} #{dir}"
+    Game::VEC_DIRS[dir][0]
   end
 end
