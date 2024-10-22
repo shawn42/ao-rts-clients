@@ -26,6 +26,10 @@ class Vec
     vec(x*scale,y*scale)
   end
 
+  def /(scale)
+    vec(x.to_f/scale,y.to_f/scale)
+  end
+
   def round
     vec(x.round, y.round)
   end

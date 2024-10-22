@@ -41,7 +41,7 @@ describe "Pathfinder#path" do
       end
     end
     # Printer.print(map, {})
-    path = Pathfinder.path(:units, map, vec(0,0), vec(31,0), 0, 64*64)
+    path = Pathfinder.path(:units, map, vec(0,0), vec(31,0), close_enough: 0, max_steps: 64*64)
     expect(path.size).to eq(28+27+32)
   end
 end

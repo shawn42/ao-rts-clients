@@ -3,7 +3,7 @@ require_relative './lib/hash_object'
 class Unit
   attr_accessor :id, :type, :status, :x, :y, :can_attack, :health, :resource, :player_id,
     :attack_type, :attack_damage, :attack_cooldown, :current_cooldown,
-    :strategy
+    :strategy, :token
   def commands
     if @strategy && @strategy.has_command?
       @strategy.commands
@@ -57,7 +57,7 @@ class Game
 
   def initialize(manager_klass)
     puts manager_klass
-    $debug_log = File.open('debug.log', 'w')
+    # $debug_log = File.open('debug.log', 'w')
     @manager_klass = manager_klass
   end
 
@@ -68,7 +68,7 @@ class Game
   end
 
   def update(update_obj)
-    $debug_log.write("UPDATE: #{update_obj.inspect}\n")
+    # $debug_log.write("UPDATE: #{update_obj.inspect}\n")
     @game_info[:player_id] ||= update_obj.player_id
     @game_info[:total_time] ||= update_obj.time
     @game_info[:time_remaining] = update_obj.time
@@ -81,10 +81,10 @@ class Game
   def generate_commands
     @unit_manager.update_strategies
     cmds = @unit_manager.commands.compact
-    debug_cmds = cmds.select { |cmd| cmd.is_a?(Hash) && cmd[:command] != 'IDENTIFY' && [5,6,7].include?(cmd[:unit]) }
-    if debug_cmds.any?
-      $debug_log.write("#{@turn}  -> CMDS: #{debug_cmds.inspect}\n")
-    end
+    # debug_cmds = cmds.select { |cmd| cmd.is_a?(Hash) && cmd[:command] != 'IDENTIFY' && [5,6,7].include?(cmd[:unit]) }
+    # if debug_cmds.any?
+      # $debug_log.write("#{@turn}  -> CMDS: #{debug_cmds.inspect}\n")
+    # end
     {commands: cmds, client_turn: @turn}
   end
 end

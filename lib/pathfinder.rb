@@ -7,7 +7,7 @@ class Pathfinder
     @paths = nil
   end
 
-  def self.path(units, map, from, to, close_enough=1, max_steps=1000, translate_to_moves=true, reservation_token=nil)
+  def self.path(units, map, from, to, close_enough: 1, max_steps: 1000, translate_to_moves: true, reservation_token: nil)
     @num_paths ||= 0
     @cache_hits ||= 0
     if h(from, to) <= close_enough
@@ -110,8 +110,12 @@ class Pathfinder
 
   def self.dir_toward(from, to)
     v = vec(to.x-from.x, to.y-from.y).unit
-    dir = vec(v.x.to_i, v.y.to_i)
-    # puts "Dir: #{from} #{to} #{dir}"
+    dir = vec(v.x.round.to_i, v.y.round.to_i)
+    if Game::VEC_DIRS[dir].nil?
+      puts "Dir: #{vec(from.x, from.y)} -> #{vec(to.x, to.y)} -> #{dir} -> #{v}"
+      # require 'pry'
+      # binding.pry
+    end
     Game::VEC_DIRS[dir][0]
   end
 end

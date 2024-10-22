@@ -29,7 +29,7 @@ class Strategy
   end
 
   def dir_toward_resource(u, r)
-    dir = dir_toward(u, r.x,r.y)
+    dir = dir_toward(u, r.x,r.y, token: u.token)
     if dir == nil
       dir = Pathfinder.dir_toward(vec(u.x,u.y), vec(r.x,r.y)) if resource_adjacent?(u, r)
     end
@@ -38,16 +38,17 @@ class Strategy
   end
 
   def dir_toward_enemy_base(u, b)
-    dir_toward(u, b.x,b.y, 1)
+    dir_toward(u, b.x,b.y)
   end
 
   def dir_toward_base(u)
-    dir_toward(u, 0,0)#, 0) only needed if we have to walk under the base
+    dir_toward(u, 0,0)#, close_enough: 0) only needed if we have to walk under the base
   end
 
-  def dir_toward(u, x,y, close_enough=1)
+  def dir_toward(u, x,y, close_enough: 1)
+    token = u.token
     if @path.nil? || @path.empty?
-      @path = Pathfinder.path(@units, @map, vec(u.x,u.y), vec(x,y), close_enough) || []
+      @path = Pathfinder.path(@units, @map, vec(u.x,u.y), vec(x,y), close_enough: close_enough, reservation_token: token) || []
     end
     @path.shift
   end
@@ -206,7 +207,7 @@ class RunAwayScared < Strategy
         safe_loc = avg_rel_enemy_loc.unit * 4
         u_vec = vec(@unit.x, @unit.y)
         tv = (u_vec - avg_rel_enemy_loc).round
-        dir = dir_toward(@unit, tv.x, tv.y, 0)
+        dir = dir_toward(@unit, tv.x, tv.y, close_enough: 0)
         puts dir
       end
       # dir_vec = avg_rel_enemy_loc.closest_cardinal
@@ -263,7 +264,7 @@ class RunAwayIfHurt < Strategy
         safe_loc = avg_rel_enemy_loc.unit * 4
         u_vec = vec(@unit.x, @unit.y)
         tv = (u_vec - avg_rel_enemy_loc).round
-        dir = dir_toward(@unit, tv.x, tv.y, 0)
+        dir = dir_toward(@unit, tv.x, tv.y, close_enough: 0)
         puts dir
       end
       # dir_vec = avg_rel_enemy_loc.closest_cardinal
@@ -358,25 +359,6 @@ class CollectNearestResource < Strategy
       end
     end
 
-    best_tile = nil
-    best_path_value = 0
-    tiles.each do |t|
-      dx = (t.x-u.x).abs
-      dy = (t.y-u.y).abs
-
-      base_dx = (t.x-b.x).abs
-      base_dy = (t.y-b.y).abs
-
-      total_dist = dx+dy+base_dx+base_dy
-      value = t.resources.value
-      path_value = value.to_f/total_dist 
-
-      if path_value > best_path_value
-        best_path_value = path_value
-        best_tile = t
-      end
-    end
-
     sorted = tiles.sort_by do |t|
       dx = (t.x-u.x).abs
       dy = (t.y-u.y).abs
@@ -411,7 +393,52 @@ end
 require_relative 'brigade'
 class BucketBrigadeCollector < CollectNearestResource
   STATES = [:no_brigade,:moving,:gathering,:dropping]
-  attr_accessor :target, :state
+  attr_accessor :target, :state, :brigade
+
+  # def self.best_resource(u, unit_manager, map, res_to_ignore=Set.new)
+  #   return CollectNearestResource.best_resource(u, unit_manager, map, res_to_ignore)
+  def self.best_resource(search_u, unit_manager, map, res_to_ignore=Set.new)
+    b = unit_manager.base
+    tiles = []
+    map.each_resource do |t|
+      r = t.resources
+      if !res_to_ignore.include?(r.id) && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
+        tiles << t 
+      end
+    end
+
+    sorted = tiles.sort_by do |t|
+      dx = 0#(t.x-search_u.x).abs
+      dy = 0#(t.y-search_u.y).abs
+
+      base_dx = (t.x-b.x).abs
+      base_dy = (t.y-b.y).abs
+
+      dx+dy+base_dx+base_dy
+    end
+    # TODO how bad would it be to cache this on the resource?
+    # bus = unit_manager.units.values().select { |u| u.type == "worker" && u.token == search_u.token }.dup
+    # avg_pos = bus.map { |b| vec(b.x, b.y) }.reduce(:+) / bus.size
+    sorted = sorted[0..10].sort_by do |t|
+      t_vec = vec(t.x,t.y)
+      b_vec = vec(b.x,b.y)
+
+      base_path = Pathfinder.path(unit_manager.units, map, t_vec, b_vec, translate_to_moves: false)
+      base_path&.size || 99_999
+      # if base_path.nil? || base_path.empty?
+      #   99_999
+      # else
+      #   # puts "Base path: #{base_path.inspect}"
+      #   path_avg = (base_path.map { |p| vec(p.x, p.y) }.reduce(:+) || 99_999) / (base_path.size || 1)
+
+      #   dx = (avg_pos.x-path_avg.x).abs
+      #   dy = (avg_pos.y-path_avg.y).abs
+      #   dx+dy
+      # end
+    end
+    # sorted.last
+    sorted.first
+  end
 
   def commands
     @state ||= :no_brigade
@@ -423,10 +450,15 @@ class BucketBrigadeCollector < CollectNearestResource
     # TODO: move this somewhere not dumb
     @unit_manager.clear_finished_brigades!
 
-    resource = self.class.best_resource(@unit, @unit_manager, @map)
+    claimed_resources = @unit_manager.brigades.map(&:resource).
+      select{|r|!r.is_a?(Vec)}. # Vec are not real resources, only piles on the ground
+      map(&:resources).compact.map{|r|r["id"]}
+    resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
     return nil unless resource
 
-    if @state == :no_brigade && @unit_manager.brigades.size >= 1 &&
+    # only allow 2 brigades for now
+    allowed_brigade_size = 2
+    if @state == :no_brigade && @unit_manager.brigades.size >= allowed_brigade_size &&
       @unit_manager.brigades.select(&:needs_help?).empty?
       return nil
     end
@@ -441,18 +473,26 @@ class BucketBrigadeCollector < CollectNearestResource
         @brigade = partial_brigade
         @target = partial_brigade.position_for(@unit)
         @state = :moving
+        # puts "JOINING BRIGADE #{partial_brigade.reservation_token}, U:#{@unit.id}, T:#{@target.x},#{@target.y}"
       else
         resources_to_ignore = @unit_manager.brigades.map(&:resource).
+          select{|r|!r.is_a?(Vec)}.
           map(&:resources).compact.map{|r|r["id"]}
 
         resource = self.class.best_resource(@unit, @unit_manager, @map, resources_to_ignore)
         if resource
-          @brigade = Brigade.new(resource, @map, @unit_manager.base)
-          @brigade.add_unit(@unit)
-          @unit_manager.brigades << @brigade
+          begin
+            @brigade = Brigade.new(resource, @map, @unit_manager)
+            @brigade.add_unit(@unit)
+            @unit_manager.brigades << @brigade
 
-          @target = @brigade.position_for(@unit)
-          @state = :moving
+            @target = @brigade.position_for(@unit)
+            @state = :moving
+          rescue Exception => e
+            puts "Error creating brigade: #{e.message}"
+            # keep waiting for a path to open up
+            @state = :no_brigade
+          end
         else
           puts "RANDO BUCKETS"
           command = nil#move_random
@@ -461,19 +501,21 @@ class BucketBrigadeCollector < CollectNearestResource
     when :moving
       u_vec = vec(@unit.x, @unit.y)
       if u_vec == @target 
-        if @brigade.done?
+        if @brigade.nil? || @brigade.done?
           @state = :no_brigade
         else
+          @brigade.progress!
           @state = :gathering
         end
       else
-        dir = dir_toward(@unit, @target.x, @target.y, 0)
+        dir = dir_toward(@unit, @target.x, @target.y, close_enough: 0)
         command = move_command(@unit, dir)
       end
     when :gathering
       dir = @brigade.dir_to_gather(@unit)
       gather_loc = @brigade.gather_loc(@unit)
       if @map.resources_at(gather_loc.x, gather_loc.y)
+        @brigade.progress!
         command = gather_command(@unit, dir)
         @state = :dropping
       elsif @brigade.unit_done?(@unit)
@@ -488,6 +530,7 @@ class BucketBrigadeCollector < CollectNearestResource
     when :dropping
       dir = @brigade.dir_to_drop(@unit)
       if dir
+        @brigade.progress!
         command = drop_command(@unit, dir, 20)
       else
         @state = :gathering
@@ -557,7 +600,7 @@ class ExploreTheUnknown < Strategy
     @close ||= 1
     u_vec = vec(@unit.x, @unit.y)
     if @target
-      @path ||= Pathfinder.path(@units, @map, u_vec, @target, @close)
+      @path ||= Pathfinder.path(@units, @map, u_vec, @target, close_enough: @close)
       if @path
         dir = @path.shift
         if dir
@@ -671,7 +714,7 @@ class DefendBase < Strategy
     if @unit.can_attack && dist <= range
       @unit.type == 'tank' ? attack_command(@unit, vec(target.x,target.y)) : melee_command(@unit, target)
     else
-      move_command(@unit, dir_toward(@unit, target.x, target.y, range))
+      move_command(@unit, dir_toward(@unit, target.x, target.y, close_enough: range))
     end
   end
 end

@@ -1,15 +1,70 @@
 class Brigade
-  attr_accessor :resource, :path, :units
-  def initialize(resource, map, base)
+  attr_accessor :resource, :path, :units, :last_progressed_turn 
+  def initialize(resource, map, unit_manager)
     @resource = resource
     @units = []
     @map = map
+    @unit_manager = unit_manager
+    base = unit_manager.base
+    @last_progressed_turn = unit_manager.turn
     b_vec = vec(base.x, base.y)
     @t_vec = vec(resource.x, resource.y)
-    @path = Pathfinder.path(nil, @map, b_vec, @t_vec, 1, 10_000, false, "brigade: #{object_id}").reverse
+    @path = Pathfinder.path(nil, @map, b_vec, @t_vec, close_enough: 1, max_steps: 10_000, translate_to_moves: false, reservation_token: reservation_token)&.reverse || []
     # NOTE if the path is even length; unit will need to stand on the base
+    puts "building brigade: for #{reservation_token} with #{@path}"
+    raise "OH NO!: no path found from #{b_vec} to #{@t_vec}!" unless @path.size > 1
+
+    @path.each do |loc|
+      @unit_manager.units.values().select{|u| u.type == "worker"}.each do |u|
+        if (u.x != 0 && u.y != 0) && u.x == loc.x && u.y == loc.y
+          # Try to move this unit out of the way!
+          brigade_strat = u.strategy
+          if brigade_strat.brigade.nil?
+            puts "!!! Trying to redirect a stalled unit!"
+            brigade_strat.target = vec(0,0)
+            brigade_strat.state = :moving
+          else
+            # puts "#{u.id} [#{u.x}, #{u.y}] is on the path at loc: [#{loc.x},#{loc.y}]!"
+            # puts "PATH: #{path}"
+            raise "OH NO!: units in the way: #{u.id}"
+          end
+        end
+      end
+    end
     @path << vec(0,0) if @path.size.even?
-    puts "building brigade: for #{reservation_token} with #{@path} and #{@units.map(&:id)}"
+    build_assignments
+  end
+
+  def progress!
+    @last_progressed_turn = @unit_manager.turn
+  end
+
+  def build_assignments
+    reserve_slots
+    avail_units = @unit_manager.units.values().select { |u| u.type == "worker" && u.strategy.brigade.nil? }.dup
+    puts "Available units: #{avail_units.size}"
+    @slots.each do |slot|
+      break if units.empty?
+      best_unit = units.min_by{ |u| dist_apart(u, slot) }
+      assign_unit(best_unit, slot)
+      avail_units.delete(best_unit)
+    end
+    
+  end
+
+  def assign_unit(best_unit, slot)
+    strat = best_unit.strategy
+    strat.brigade = self
+    @units << best_unit
+    strat.target = slot
+    strat.state = :moving
+  end
+
+  def dist_apart(loc1, loc2)
+    # ignore the sqrt for now
+    base_dx = (loc1.x-loc2.x).abs
+    base_dy = (loc1.y-loc2.y).abs
+    base_dy^2 + base_dx^2
   end
 
   def reassign(unit)
@@ -32,21 +87,36 @@ class Brigade
     "brigade: #{object_id}"
   end
 
+  def reserve_slots
+    @slots = @path.select.with_index { |_, i| i.odd? }
+    slots = @slots.reject{|s|s.x == 0 && s.y == 0}
+    slots.each do |loc|
+      @map.reserve(loc.x, loc.y, reservation_token)
+    end
+  end
+
   def add_unit(unit)
+    unit.token = reservation_token
     @units << unit
-    puts "adding unit #{unit.id} to brigade w target: #{@t_vec}, now had #{@units.size} units"
+    # puts "adding unit #{unit.id} to brigade w target: #{@t_vec}, now had #{@units.size} units"
   end
 
   def destroy!
+    puts "destroying #{reservation_token} -> #{@units.map(&:id)}"
     @units.each do |u|
+      u.token = nil
       brigade_strat = u.strategy
-      # brigade_strat.brigade = nil
+      brigade_strat.brigade = nil
       brigade_strat.target = vec(0,0)
       brigade_strat.state = :moving
     end
     @path.each do |loc|
-      @map.trans_at(loc.x, loc.y).reserved_for = nil
+      @map.release(loc.x, loc.y)
     end
+  end
+
+  def stalled?
+    (@unit_manager.turn-@last_progressed_turn) > 80
   end
 
   def done?
@@ -83,7 +153,6 @@ class Brigade
       !unit_has_resource?(unit) && !location_has_resource?(gather_loc(unit)) && unit_done?(prev_unit)
     end
 
-    puts "unit #{unit.id} done? #{done}"
     done
   end
 
@@ -97,13 +166,16 @@ class Brigade
 
   def dir_to_gather(unit)
     target = gather_loc(unit)
+    if vec(unit.x, unit.y) == vec(target.x, target.y)
+      raise "OH NO!: invalid gather location: #{target}"
+    end
     Pathfinder.dir_toward(unit, target)
   end
 
   def gather_loc(unit)
     pos_in_line = @units.index(unit)
     i = spot_for_nth_worker(pos_in_line)-1
-    unit == @units.first ? vec(@resource.x, @resource.y) : @path[i % @path.size]
+    unit == @units.first ? vec(@resource.x, @resource.y) : @path[i]
   end
 
   def dir_to_drop(unit)
@@ -117,7 +189,7 @@ class Brigade
 
   def position_for(unit)
     pos_in_line = @units.index(unit)
-    i = spot_for_nth_worker(pos_in_line) % @path.size
+    i = spot_for_nth_worker(pos_in_line)
     res = @path[i]
     res
   end

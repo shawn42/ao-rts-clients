@@ -1,5 +1,5 @@
 class UnitManager
-  attr_reader :units
+  attr_reader :units, :turn
   def initialize(game_info, map)
     @game_info = game_info
     @map = map
@@ -40,6 +40,7 @@ class UnitManager
   end
   
   def update(updates, turn)
+    @turn = turn
     (updates.unit_updates || []).each do |uu|
       u = @units[uu.id] || Unit.new
       # $debug_file ||= File.open('debug.txt','w+')

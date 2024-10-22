@@ -10,11 +10,13 @@ class Map
   end
 
   def reserve(x,y,token)
-    at(x+@width, y+@height).reserved_for = token
+    trans_at(x, y).reserved_for = token
+    Pathfinder.clear_cache!
   end
 
   def release(x,y)
-    at(x+@width, y+@height).reserved_for = nil
+    trans_at(x, y).reserved_for = nil
+    Pathfinder.clear_cache!
   end
 
   def at(x,y)
@@ -125,6 +127,10 @@ class Map
 
   def resources_at(x, y)
     trans_at(x, y)&.resources
+  end
+
+  def enemy_units_at(x, y)
+    trans_at(x, y)&.units
   end
 
   private

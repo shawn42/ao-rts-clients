@@ -18,21 +18,27 @@ class BrigadeUnitManager < UnitManager
     @map.resource_tiles.size < workers.size && scouts.size < 1
   end
   def should_build_tank?
-    return false
-    #units_by_type("tank").select(&:alive?).size < 1
+    # return false
+    units_by_type("tank").select(&:alive?).size < 1
   end
 
   def clear_finished_brigades!
-    @max_brigade_workers_needed = @brigades.map(&:max_workers).max || 0
+    # trying to run N brigades at once...
+    @max_brigade_workers_needed = @brigades.map(&:max_workers).sum
     @brigades.each do |brigade|
-      brigade.destroy! if brigade.done?
+      brigade.destroy! if brigade.done? || brigade.stalled?
     end
     @brigades.reject!(&:done?)
+    @brigades.reject!(&:stalled?)
   end
 
 
   def should_build_worker?
-    @max_brigade_workers_needed > units_by_type("worker").select(&:alive?).size
+    # +1 to allow for an additional worker to start a new brigade if we
+    # encounter a new longer brigade
+    current_workers = units_by_type("worker").select(&:alive?).size
+    return false if current_workers >= 16 # ~16 seems optimal
+    @max_brigade_workers_needed+1 > current_workers
 
     # return false
     # res = BucketBrigadeCollector.best_resource(vec(0,0), self, @map)
