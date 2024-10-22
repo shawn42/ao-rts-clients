@@ -1,5 +1,5 @@
 class Brigade
-  attr_accessor :resource, :path, :units, :last_progressed_turn 
+  attr_accessor :resource, :path, :units, :last_progressed_turn, :slots
   def initialize(resource, map, unit_manager)
     @resource = resource
     @units = []
@@ -9,6 +9,14 @@ class Brigade
     @last_progressed_turn = unit_manager.turn
     b_vec = vec(base.x, base.y)
     @t_vec = vec(resource.x, resource.y)
+    
+    # TODO find mid point that is closest to the resource
+    # unit_manager.brigades.each do |b|
+    #   if b.slots.size > 4
+    #     b_vec = b.slots[b.slots.size/2]
+    #   end
+    # end
+
     @path = Pathfinder.path(nil, @map, b_vec, @t_vec, close_enough: 1, max_steps: 10_000, translate_to_moves: false, reservation_token: reservation_token)&.reverse || []
     # puts "building brigade: for #{reservation_token} with #{@path}"
     raise "OH NO!: no path found from #{b_vec} to #{@t_vec}!" unless @path.size > 1

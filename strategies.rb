@@ -414,7 +414,10 @@ class BucketBrigadeCollector < CollectNearestResource
       base_dx = (t.x-b.x).abs
       base_dy = (t.y-b.y).abs
 
-      base_dx+base_dy
+      dx = (t.x-search_u.x).abs
+      dy = (t.y-search_u.y).abs
+
+      base_dx+base_dy+dx+dy
     end
     sorted = sorted[0..10].sort_by do |t|
       t_vec = vec(t.x,t.y)
