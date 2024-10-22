@@ -42,21 +42,21 @@ class Brigade
   def build_assignments
     reserve_slots
     avail_units = @unit_manager.units.values().select { |u| u.type == "worker" && u.strategy.brigade.nil? }.dup
-    puts "Available units: #{avail_units.size}"
+    puts "Available units: #{avail_units.size} for #{@slots.size} slots"
     @slots.each do |slot|
-      break if units.empty?
-      best_unit = units.min_by{ |u| dist_apart(u, slot) }
+      break if avail_units.empty?
+      best_unit = avail_units.min_by{ |u| dist_apart(u, slot) }
       assign_unit(best_unit, slot)
       avail_units.delete(best_unit)
     end
     
   end
 
-  def assign_unit(best_unit, slot)
-    strat = best_unit.strategy
+  def assign_unit(unit, slot)
+    add_unit(unit)
+    strat = unit.strategy
     strat.brigade = self
-    @units << best_unit
-    strat.target = slot
+    strat.target = position_for(unit)
     strat.state = :moving
   end
 
@@ -68,6 +68,7 @@ class Brigade
   end
 
   def reassign(unit)
+    puts "Reassigning #{unit.id} to brigade"
     @units.delete(unit)
     loc = @path.shift
     @map.trans_at(loc.x, loc.y).reserved_for = nil
@@ -116,7 +117,7 @@ class Brigade
   end
 
   def stalled?
-    (@unit_manager.turn-@last_progressed_turn) > 80
+    (@unit_manager.turn-@last_progressed_turn) > 90
   end
 
   def done?
@@ -174,8 +175,12 @@ class Brigade
 
   def gather_loc(unit)
     pos_in_line = @units.index(unit)
-    i = spot_for_nth_worker(pos_in_line)-1
-    unit == @units.first ? vec(@resource.x, @resource.y) : @path[i]
+    if pos_in_line
+      i = spot_for_nth_worker(pos_in_line)-1
+      unit == @units.first ? vec(@resource.x, @resource.y) : @path[i]
+    else
+      raise "not a valid unit for this brigade"
+    end
   end
 
   def dir_to_drop(unit)

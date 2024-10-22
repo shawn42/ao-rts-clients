@@ -443,10 +443,6 @@ class BucketBrigadeCollector < CollectNearestResource
   def commands
     @state ||= :no_brigade
 
-    brigade_index = ""
-    brigade_pos = ""
-
-
     # TODO: move this somewhere not dumb
     @unit_manager.clear_finished_brigades!
 
@@ -483,11 +479,8 @@ class BucketBrigadeCollector < CollectNearestResource
         if resource
           begin
             @brigade = Brigade.new(resource, @map, @unit_manager)
-            @brigade.add_unit(@unit)
             @unit_manager.brigades << @brigade
-
-            @target = @brigade.position_for(@unit)
-            @state = :moving
+            return commands
           rescue Exception => e
             puts "Error creating brigade: #{e.message}"
             # keep waiting for a path to open up
@@ -508,6 +501,7 @@ class BucketBrigadeCollector < CollectNearestResource
           @state = :gathering
         end
       else
+        @brigade&.progress!
         dir = dir_toward(@unit, @target.x, @target.y, close_enough: 0)
         command = move_command(@unit, dir)
       end
@@ -547,9 +541,7 @@ class BucketBrigadeCollector < CollectNearestResource
       command = nil
     end
 
-    name = "#{brigade_index}.#{brigade_pos}.#{@state[0]}"
-    ident = identify_command(@unit, name)
-    [command, ident].compact
+    [command].compact
   end
 end
 
