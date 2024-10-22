@@ -395,9 +395,12 @@ class BucketBrigadeCollector < CollectNearestResource
   STATES = [:no_brigade,:moving,:gathering,:dropping]
   attr_accessor :target, :state, :brigade
 
-  # def self.best_resource(u, unit_manager, map, res_to_ignore=Set.new)
-  #   return CollectNearestResource.best_resource(u, unit_manager, map, res_to_ignore)
   def self.best_resource(search_u, unit_manager, map, res_to_ignore=Set.new)
+    best_reses = best_resources(search_u, unit_manager, map, res_to_ignore)
+    best_reses[0..2].sample
+  end
+
+  def self.best_resources(search_u, unit_manager, map, res_to_ignore=Set.new)
     b = unit_manager.base
     tiles = []
     map.each_resource do |t|
@@ -420,8 +423,6 @@ class BucketBrigadeCollector < CollectNearestResource
       base_path = Pathfinder.path(unit_manager.units, map, t_vec, b_vec, translate_to_moves: false)
       base_path&.size || 99_999
     end
-    # sorted.first
-    sorted[0..2].sample
   end
 
   def commands
@@ -461,8 +462,9 @@ class BucketBrigadeCollector < CollectNearestResource
           end
         end
 
-        resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
-        if resource
+        # try our best guesses until one finds a path
+        resources = self.class.best_resources(@unit, @unit_manager, @map, claimed_resources)
+        while resource = resources.shift
           begin
             @brigade = Brigade.new(resource, @map, @unit_manager)
             @unit_manager.brigades << @brigade
@@ -472,10 +474,9 @@ class BucketBrigadeCollector < CollectNearestResource
             # keep waiting for a path to open up
             @state = :no_brigade
           end
-        else
-          puts "RANDO BUCKETS"
-          command = nil#move_random
         end
+        puts "RANDO BUCKETS"
+        command = move_random
       end
     when :moving
       u_vec = vec(@unit.x, @unit.y)
