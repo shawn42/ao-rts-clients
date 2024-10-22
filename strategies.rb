@@ -405,7 +405,7 @@ class BucketBrigadeCollector < CollectNearestResource
     tiles = []
     map.each_resource do |t|
       r = t.resources
-      if !res_to_ignore.include?(r.id)# && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
+      unless res_to_ignore.include?(r.id)# && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
         tiles << t 
       end
     end
@@ -425,11 +425,12 @@ class BucketBrigadeCollector < CollectNearestResource
       dx2 = (b.x-avg_idle_work_pos.x).abs
       dy2 = (b.y-avg_idle_work_pos.y).abs
 
-      # weigh the base distance more heavily
-      # base_dx+base_dy+((dx+dy)*0.6)
-      base_dx+base_dy+((dx+dy+dx2+dy2)/1)
+      value_factor = t.resources.value
+      total_factor = t.resources.total
+      # ((base_dx+base_dy)*0.2)+((dx+dy+dx2+dy2)*0.9)-(value_factor*0.4)-(total_factor*0.005)
+      ((base_dx+base_dy)*0.7)+((dx+dy+dx2+dy2)*1.0)-(value_factor*0.3)-(total_factor*0.002)
     end
-    sorted = sorted[0..14].sort_by do |t|
+    sorted = sorted[0..12].sort_by do |t|
       t_vec = vec(t.x,t.y)
       b_vec = vec(b.x,b.y)
 
@@ -445,6 +446,7 @@ class BucketBrigadeCollector < CollectNearestResource
     @unit_manager.clear_finished_brigades!
 
 
+    # puts "Brigade size: #{@unit_manager.brigades.size}"
     allowed_brigade_size = 5
     if @state == :no_brigade && @unit_manager.brigades.size >= allowed_brigade_size &&
       @unit_manager.brigades.select(&:needs_help?).empty?
@@ -466,6 +468,11 @@ class BucketBrigadeCollector < CollectNearestResource
         @unit_manager.brigades.each do |b|
           if b.resource&.is_a?(Tile)
             claimed_resources << b.resource.resources.id if b.resource.resources
+          else
+            if b.resource
+              res = @map.resources_at(b.resource.x, b.resource.y)
+              claimed_resources << res.id if res
+            end
           end
           b.path.each do |p_loc|
             res = @map.resources_at(p_loc.x, p_loc.y)
@@ -596,14 +603,15 @@ class ExploreTheUnknown < Strategy
     @unit.status == 'idle'
   end
   def command
-    return nil if @done
+    # return move_random if @done
     if @target.nil?
       nearest = nearest_unknown(@map, @unit)
       if nearest
         @target = nearest - @map.offset
       else
-        @done = true
-        return nil
+        return move_random
+        # @done = true
+        # return nil
       end
     end
     @close ||= 1

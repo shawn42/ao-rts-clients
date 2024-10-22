@@ -15,7 +15,10 @@ class BrigadeUnitManager < UnitManager
     scouts = units_by_type("scout").select(&:alive?)
 
     # TODO factor in unexplored cell count
-    @map.resource_tiles.size < workers.size && scouts.size < 1
+    # stagger out the second so they take different paths
+    (@map.resource_tiles.size < workers.size && scouts.size < 1) || 
+    (turn > 30 && @map.resource_tiles.size < workers.size && scouts.size < 2)
+
   end
   def should_build_tank?
     # return false
@@ -35,7 +38,9 @@ class BrigadeUnitManager < UnitManager
 
   def should_build_worker?
     current_workers = units_by_type("worker").select(&:alive?).size
-    return false if current_workers >= 17 # ~16 seems optimal
+    # puts "#{@map.resource_tiles.size} resource tiles, #{current_workers} workers"
+    return false if current_workers >= 30 # too much! this is a safeguard
+    return false if current_workers >= @map.resource_tiles.size*0.6 #17 # ~16 seems optimal
     @max_brigade_workers_needed+1 > current_workers
   end
 
