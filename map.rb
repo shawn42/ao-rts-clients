@@ -125,6 +125,19 @@ class Map
     Pathfinder.clear_cache! if any_tiles_updated
   end
 
+  def can_gather?(x, y)
+    @gathers ||= {}
+
+    key = [x,y]
+    res = resources_at(x, y)
+    return false if res.nil?
+
+    @gathers[key] ||= 0
+    @gathers[key] += 1
+
+    (@gathers[key]-1)*res.value < res.total
+  end
+
   def resources_at(x, y)
     trans_at(x, y)&.resources
   end
@@ -135,6 +148,7 @@ class Map
 
   private
   def update_tile_attrs(tile, attrs)
+    @gathers = {}
     tile.status = :known
     attrs.each do |k,v|
       tile.send("#{k}=", v)

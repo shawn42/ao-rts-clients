@@ -122,7 +122,9 @@ class Brigade
   end
 
   def stalled?
-    (@unit_manager.turn-@last_progressed_turn) > 80
+    stalled = (@unit_manager.turn-@last_progressed_turn) > 80
+    puts "AAAAAAAAAAAAAHHHHHHHHH STALLED!" if stalled
+    stalled
   end
 
   def done?
@@ -133,7 +135,7 @@ class Brigade
       u = @units[i]
       return false if u && unit_has_resource?(u)
     end
-    puts "#{reservation_token} is done!"
+    # puts "#{reservation_token} is done!"
     true
   end
 

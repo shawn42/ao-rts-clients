@@ -29,7 +29,7 @@ class Strategy
   end
 
   def dir_toward_resource(u, r)
-    dir = dir_toward(u, r.x,r.y, token: u.token)
+    dir = dir_toward(u, r.x,r.y)
     if dir == nil
       dir = Pathfinder.dir_toward(vec(u.x,u.y), vec(r.x,r.y)) if resource_adjacent?(u, r)
     end
@@ -405,21 +405,31 @@ class BucketBrigadeCollector < CollectNearestResource
     tiles = []
     map.each_resource do |t|
       r = t.resources
-      if !res_to_ignore.include?(r.id) && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
+      if !res_to_ignore.include?(r.id)# && (r.total / r.value) > unit_manager.resource_assignments(r.id).size
         tiles << t 
       end
     end
 
+    idle_workers = unit_manager.units.values().select{|u| u.type == "worker" && u.status == 'idle'}
+    avg_idle_work_pos = idle_workers.map{|u| vec(u.x,u.y)}.reduce(:+) / idle_workers.size || vec(0,0)
+    
     sorted = tiles.sort_by do |t|
       base_dx = (t.x-b.x).abs
       base_dy = (t.y-b.y).abs
 
-      dx = (t.x-search_u.x).abs
-      dy = (t.y-search_u.y).abs
+      # dx = (t.x-search_u.x).abs
+      # dy = (t.y-search_u.y).abs
+      dx = (t.x-avg_idle_work_pos.x).abs
+      dy = (t.y-avg_idle_work_pos.y).abs
 
-      base_dx+base_dy+dx+dy
+      dx2 = (b.x-avg_idle_work_pos.x).abs
+      dy2 = (b.y-avg_idle_work_pos.y).abs
+
+      # weigh the base distance more heavily
+      # base_dx+base_dy+((dx+dy)*0.6)
+      base_dx+base_dy+((dx+dy+dx2+dy2)/1)
     end
-    sorted = sorted[0..10].sort_by do |t|
+    sorted = sorted[0..14].sort_by do |t|
       t_vec = vec(t.x,t.y)
       b_vec = vec(b.x,b.y)
 
@@ -467,18 +477,31 @@ class BucketBrigadeCollector < CollectNearestResource
 
         # try our best guesses until one finds a path
         resources = self.class.best_resources(@unit, @unit_manager, @map, claimed_resources)
+        available_resource_count = resources.size
+        if available_resource_count == 0
+          puts "no resources available, TODO: swap to explore strat?"
+        end
         while resource = resources.shift
           begin
             @brigade = Brigade.new(resource, @map, @unit_manager)
             @unit_manager.brigades << @brigade
             return commands
           rescue Exception => e
-            puts "Error creating brigade: #{e.message}"
+            # puts "Error creating brigade: #{e.message}"
+            if e.message.match(/no path found/i)
+              STDOUT.write("?")
+            elsif e.message.match(/units in the way/i)
+              STDOUT.write("!")
+            else
+              puts "Error creating brigade: #{e.message}"
+            end
             # keep waiting for a path to open up
             @state = :no_brigade
           end
         end
-        puts "RANDO BUCKETS"
+        if available_resource_count > 0
+          puts "RANDO BUCKETS after failing to path: #{available_resource_count} resources"
+        end
         command = move_random
       end
     when :moving
@@ -491,7 +514,7 @@ class BucketBrigadeCollector < CollectNearestResource
           @state = :gathering
         end
       else
-        # @brigade&.progress!
+        @brigade&.progress!
         dir = dir_toward(@unit, @target.x, @target.y, close_enough: 0)
         command = move_command(@unit, dir)
       end
@@ -501,7 +524,7 @@ class BucketBrigadeCollector < CollectNearestResource
       end
       dir = @brigade.dir_to_gather(@unit)
       gather_loc = @brigade.gather_loc(@unit)
-      if @map.resources_at(gather_loc.x, gather_loc.y)
+      if @map.can_gather?(gather_loc.x, gather_loc.y)
         @brigade.progress!
         command = gather_command(@unit, dir)
         @state = :dropping
