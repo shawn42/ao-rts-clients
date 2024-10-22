@@ -446,22 +446,6 @@ class BucketBrigadeCollector < CollectNearestResource
     # TODO: move this somewhere not dumb
     @unit_manager.clear_finished_brigades!
 
-    claimed_resources = []
-    @unit_manager.brigades.each do |b|
-      if b.resource&.is_a?(Tile)
-        claimed_resources << b.resource.resources.id if b.resource.resources
-      end
-      b.path.each do |p_loc|
-        res = @map.resources_at(p_loc.x, p_loc.y)
-        if res
-          claimed_resources << res.id
-        end
-      end
-    end
-
-    resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
-    return nil unless resource
-
 
     # only allow 2 brigades for now
     allowed_brigade_size = 3
@@ -482,6 +466,19 @@ class BucketBrigadeCollector < CollectNearestResource
         @state = :moving
         # puts "JOINING BRIGADE #{partial_brigade.reservation_token}, U:#{@unit.id}, T:#{@target.x},#{@target.y}"
       else
+        claimed_resources = []
+        @unit_manager.brigades.each do |b|
+          if b.resource&.is_a?(Tile)
+            claimed_resources << b.resource.resources.id if b.resource.resources
+          end
+          b.path.each do |p_loc|
+            res = @map.resources_at(p_loc.x, p_loc.y)
+            if res
+              claimed_resources << res.id
+            end
+          end
+        end
+
         resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
         if resource
           begin
