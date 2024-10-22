@@ -35,7 +35,7 @@ class BrigadeUnitManager < UnitManager
 
   def should_build_worker?
     current_workers = units_by_type("worker").select(&:alive?).size
-    return false if current_workers >= 16 # ~16 seems optimal
+    return false if current_workers >= 17 # ~16 seems optimal
     @max_brigade_workers_needed+1 > current_workers
   end
 

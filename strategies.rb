@@ -408,36 +408,20 @@ class BucketBrigadeCollector < CollectNearestResource
     end
 
     sorted = tiles.sort_by do |t|
-      dx = 0#(t.x-search_u.x).abs
-      dy = 0#(t.y-search_u.y).abs
-
       base_dx = (t.x-b.x).abs
       base_dy = (t.y-b.y).abs
 
-      dx+dy+base_dx+base_dy
+      base_dx+base_dy
     end
-    # TODO how bad would it be to cache this on the resource?
-    # bus = unit_manager.units.values().select { |u| u.type == "worker" && u.token == search_u.token }.dup
-    # avg_pos = bus.map { |b| vec(b.x, b.y) }.reduce(:+) / bus.size
     sorted = sorted[0..10].sort_by do |t|
       t_vec = vec(t.x,t.y)
       b_vec = vec(b.x,b.y)
 
       base_path = Pathfinder.path(unit_manager.units, map, t_vec, b_vec, translate_to_moves: false)
       base_path&.size || 99_999
-      # if base_path.nil? || base_path.empty?
-      #   99_999
-      # else
-      #   # puts "Base path: #{base_path.inspect}"
-      #   path_avg = (base_path.map { |p| vec(p.x, p.y) }.reduce(:+) || 99_999) / (base_path.size || 1)
-
-      #   dx = (avg_pos.x-path_avg.x).abs
-      #   dy = (avg_pos.y-path_avg.y).abs
-      #   dx+dy
-      # end
     end
-    # sorted.last
-    sorted.first
+    # sorted.first
+    sorted[0..2].sample
   end
 
   def commands
@@ -447,8 +431,7 @@ class BucketBrigadeCollector < CollectNearestResource
     @unit_manager.clear_finished_brigades!
 
 
-    # only allow 2 brigades for now
-    allowed_brigade_size = 3
+    allowed_brigade_size = 4
     if @state == :no_brigade && @unit_manager.brigades.size >= allowed_brigade_size &&
       @unit_manager.brigades.select(&:needs_help?).empty?
       return nil
@@ -464,7 +447,6 @@ class BucketBrigadeCollector < CollectNearestResource
         @brigade = partial_brigade
         @target = partial_brigade.position_for(@unit)
         @state = :moving
-        # puts "JOINING BRIGADE #{partial_brigade.reservation_token}, U:#{@unit.id}, T:#{@target.x},#{@target.y}"
       else
         claimed_resources = []
         @unit_manager.brigades.each do |b|
@@ -505,7 +487,7 @@ class BucketBrigadeCollector < CollectNearestResource
           @state = :gathering
         end
       else
-        @brigade&.progress!
+        # @brigade&.progress!
         dir = dir_toward(@unit, @target.x, @target.y, close_enough: 0)
         command = move_command(@unit, dir)
       end
@@ -530,7 +512,7 @@ class BucketBrigadeCollector < CollectNearestResource
       dir = @brigade.dir_to_drop(@unit)
       if dir
         @brigade.progress!
-        command = drop_command(@unit, dir, 20)
+        command = drop_command(@unit, dir, 40)
       else
         @state = :gathering
       end

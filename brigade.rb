@@ -101,7 +101,6 @@ class Brigade
   end
 
   def destroy!
-    puts "destroying #{reservation_token} -> #{@units.map(&:id)}"
     @units.each do |u|
       u.token = nil
       brigade_strat = u.strategy
@@ -115,7 +114,7 @@ class Brigade
   end
 
   def stalled?
-    (@unit_manager.turn-@last_progressed_turn) > 90
+    (@unit_manager.turn-@last_progressed_turn) > 80
   end
 
   def done?
