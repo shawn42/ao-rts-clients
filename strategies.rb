@@ -432,7 +432,7 @@ class BucketBrigadeCollector < CollectNearestResource
     @unit_manager.clear_finished_brigades!
 
 
-    allowed_brigade_size = 4
+    allowed_brigade_size = 5
     if @state == :no_brigade && @unit_manager.brigades.size >= allowed_brigade_size &&
       @unit_manager.brigades.select(&:needs_help?).empty?
       return nil
