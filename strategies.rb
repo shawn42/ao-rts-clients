@@ -493,6 +493,9 @@ class BucketBrigadeCollector < CollectNearestResource
         command = move_command(@unit, dir)
       end
     when :gathering
+      unless @brigade.units.include?(@unit)
+        puts "Error: gathering state but unit not in brigade"
+      end
       dir = @brigade.dir_to_gather(@unit)
       gather_loc = @brigade.gather_loc(@unit)
       if @map.resources_at(gather_loc.x, gather_loc.y)
