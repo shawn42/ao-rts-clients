@@ -446,14 +446,25 @@ class BucketBrigadeCollector < CollectNearestResource
     # TODO: move this somewhere not dumb
     @unit_manager.clear_finished_brigades!
 
-    claimed_resources = @unit_manager.brigades.map(&:resource).
-      select{|r|!r.is_a?(Vec)}. # Vec are not real resources, only piles on the ground
-      map(&:resources).compact.map{|r|r["id"]}
+    claimed_resources = []
+    @unit_manager.brigades.each do |b|
+      if b.resource&.is_a?(Tile)
+        claimed_resources << b.resource.resources.id if b.resource.resources
+      end
+      b.path.each do |p_loc|
+        res = @map.resources_at(p_loc.x, p_loc.y)
+        if res
+          claimed_resources << res.id
+        end
+      end
+    end
+
     resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
     return nil unless resource
 
+
     # only allow 2 brigades for now
-    allowed_brigade_size = 2
+    allowed_brigade_size = 3
     if @state == :no_brigade && @unit_manager.brigades.size >= allowed_brigade_size &&
       @unit_manager.brigades.select(&:needs_help?).empty?
       return nil
@@ -471,11 +482,7 @@ class BucketBrigadeCollector < CollectNearestResource
         @state = :moving
         # puts "JOINING BRIGADE #{partial_brigade.reservation_token}, U:#{@unit.id}, T:#{@target.x},#{@target.y}"
       else
-        resources_to_ignore = @unit_manager.brigades.map(&:resource).
-          select{|r|!r.is_a?(Vec)}.
-          map(&:resources).compact.map{|r|r["id"]}
-
-        resource = self.class.best_resource(@unit, @unit_manager, @map, resources_to_ignore)
+        resource = self.class.best_resource(@unit, @unit_manager, @map, claimed_resources)
         if resource
           begin
             @brigade = Brigade.new(resource, @map, @unit_manager)
@@ -517,6 +524,7 @@ class BucketBrigadeCollector < CollectNearestResource
           @target = @brigade.position_for(@unit)
           @state = :moving
         else
+          @unit.token = nil
           @brigade = nil
           @state = :no_brigade
         end

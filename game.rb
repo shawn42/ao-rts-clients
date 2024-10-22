@@ -15,7 +15,7 @@ class Unit
   end
 
   def inspect
-    "U:#{type}(id: #{id}, type: #{type}, status: #{status}, x:{x}, y: #{y}, can_attack: #{can_attack}, health: #{health}, resources: #{resources}, player_id: #{player_id}"
+    "U:#{type}(id: #{id}, type: #{type}, status: #{status}, x:{x}, y: #{y}, can_attack: #{can_attack}, health: #{health}, resource: #{resource}, player_id: #{player_id}"
   end
 end
 

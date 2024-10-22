@@ -10,8 +10,7 @@ class Brigade
     b_vec = vec(base.x, base.y)
     @t_vec = vec(resource.x, resource.y)
     @path = Pathfinder.path(nil, @map, b_vec, @t_vec, close_enough: 1, max_steps: 10_000, translate_to_moves: false, reservation_token: reservation_token)&.reverse || []
-    # NOTE if the path is even length; unit will need to stand on the base
-    puts "building brigade: for #{reservation_token} with #{@path}"
+    # puts "building brigade: for #{reservation_token} with #{@path}"
     raise "OH NO!: no path found from #{b_vec} to #{@t_vec}!" unless @path.size > 1
 
     @path.each do |loc|
@@ -31,6 +30,7 @@ class Brigade
         end
       end
     end
+    # NOTE if the path is even length; unit will need to stand on the base
     @path << vec(0,0) if @path.size.even?
     build_assignments
   end
@@ -42,7 +42,6 @@ class Brigade
   def build_assignments
     reserve_slots
     avail_units = @unit_manager.units.values().select { |u| u.type == "worker" && u.strategy.brigade.nil? }.dup
-    puts "Available units: #{avail_units.size} for #{@slots.size} slots"
     @slots.each do |slot|
       break if avail_units.empty?
       best_unit = avail_units.min_by{ |u| dist_apart(u, slot) }
@@ -68,7 +67,6 @@ class Brigade
   end
 
   def reassign(unit)
-    puts "Reassigning #{unit.id} to brigade"
     @units.delete(unit)
     loc = @path.shift
     @map.trans_at(loc.x, loc.y).reserved_for = nil
